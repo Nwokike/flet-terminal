@@ -1,0 +1,20 @@
+site_name: FletTerminal Documentation
+site_description: Native GPU-accelerated Terminal control for Flet using xterm.dart
+site_author: Onyeka Nwokike
+site_url: https://github.com/Nwokike/flet-terminal
+
+theme:
+  name: material
+  palette:
+    - scheme: dark
+      primary: indigo
+      accent: cyan
+
+nav:
+  - Overview: index.md
+  - API Reference: FletTerminal.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences

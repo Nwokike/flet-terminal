@@ -1,0 +1,442 @@
+"""FletTerminal Cross-Platform Test App & Demo Studio.
+
+Tests FletTerminal across Web, Linux, Windows, and Android with built-in
+VT100/ANSI stress testing engines and local OS PTY integration (`bash` / `PowerShell`).
+"""
+
+import asyncio
+import json
+import os
+import struct
+import sys
+import threading
+import time
+import flet as ft
+from flet_terminal import Terminal
+
+# Try importing POSIX pty (Linux/macOS)
+try:
+    import fcntl
+    import pty
+    import termios
+    HAS_POSIX_PTY = True
+except ImportError:
+    HAS_POSIX_PTY = False
+
+# Try importing Windows ConPTY (pywinpty)
+try:
+    import winpty
+    HAS_WIN_PTY = True
+except ImportError:
+    HAS_WIN_PTY = False
+
+
+def main(page: ft.Page):
+    page.title = "FletTerminal Studio - Cross-Platform Multi-Engine Harness"
+    page.theme_mode = ft.ThemeMode.DARK
+    page.padding = 0
+    page.bgcolor = "#12121A"
+
+    # Themes definitions
+    themes = {
+        "Dracula": {
+            "background": "#1E1F29",
+            "foreground": "#F8F8F2",
+            "cursor": "#FF79C6",
+            "selection": "#44475A",
+            "black": "#21222C",
+            "red": "#FF5555",
+            "green": "#50FA7B",
+            "yellow": "#F1FA8C",
+            "blue": "#BD93F9",
+            "magenta": "#FF79C6",
+            "cyan": "#8BE9FD",
+            "white": "#F8F8F2",
+        },
+        "JetBrains Dark": {
+            "background": "#1E1E2E",
+            "foreground": "#CDD6F4",
+            "cursor": "#F5E0DC",
+            "selection": "#585B70",
+            "black": "#45475A",
+            "red": "#F38BA8",
+            "green": "#A6E3A1",
+            "yellow": "#F9E2AF",
+            "blue": "#89B4FA",
+            "magenta": "#F5C2E7",
+            "cyan": "#94E2D5",
+            "white": "#BAC2DE",
+        },
+        "Matrix Green": {
+            "background": "#0D1117",
+            "foreground": "#00FF66",
+            "cursor": "#00FF66",
+            "selection": "#163320",
+            "black": "#0D1117",
+            "red": "#FF5555",
+            "green": "#00FF66",
+            "yellow": "#FFFF00",
+            "blue": "#0088FF",
+            "magenta": "#FF00FF",
+            "cyan": "#00FFFF",
+            "white": "#FFFFFF",
+        },
+    }
+
+    active_theme_name = "JetBrains Dark"
+
+    # Terminal instance
+    terminal = Terminal(
+        expand=True,
+        scrollback=10000,
+        font_family="JetBrains Mono",
+        font_size=13.0,
+        cursor_style="block",
+        cursor_blink=True,
+        theme=themes[active_theme_name],
+        auto_focus=True,
+    )
+
+    active_engine = "ANSI Demo Engine"
+    pty_master_fd = None
+    pty_process = None
+    pty_thread = None
+
+    # Status Bar indicators
+    engine_status_text = ft.Text("⚡ Active Engine: ANSI VT100 Demo Engine", size=12, weight=ft.FontWeight.BOLD, color="#A6E3A1")
+    os_status_text = ft.Text(f"🖥️ Target OS: {sys.platform.upper()} | HAS_POSIX_PTY: {HAS_POSIX_PTY} | HAS_WIN_PTY: {HAS_WIN_PTY}", size=11, color="#7F849C")
+    title_status_text = ft.Text("📌 Title: FletTerminal", size=11, color="#89B4FA")
+
+    # Event handlers from terminal
+    def handle_title_change(e):
+        title_status_text.value = f"📌 Title: {e.data}"
+        page.update()
+
+    def handle_bell(e):
+        page.show_snack_bar(ft.SnackBar(ft.Text("🔔 Terminal Bell Triggered! (\a)"), bgcolor="#F38BA8", duration=1500))
+
+    terminal.on_title_change = handle_title_change
+    terminal.on_bell = handle_bell
+
+    # Handle incoming bytes from Dart widget
+    def handle_terminal_bytes(payload: bytes):
+        nonlocal pty_master_fd, pty_process
+        if active_engine == "Local OS PTY":
+            if HAS_POSIX_PTY and pty_master_fd is not None:
+                try:
+                    os.write(pty_master_fd, payload)
+                except OSError:
+                    pass
+            elif HAS_WIN_PTY and pty_process is not None:
+                try:
+                    pty_process.write(payload.decode("utf-8", errors="ignore"))
+                except Exception:
+                    pass
+        else:
+            # Interactive Demo Engine response
+            text = payload.decode("utf-8", errors="ignore")
+            if text == "\r":
+                terminal.send_bytes(b"\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
+            elif text == "\x03":  # Ctrl+C
+                terminal.send_bytes(b"^C\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
+            else:
+                # Echo typed characters
+                terminal.send_bytes(payload)
+
+    terminal.set_on_bytes(handle_terminal_bytes)
+
+    # Handle resizing
+    def handle_resize(e):
+        nonlocal pty_master_fd, pty_process
+        try:
+            data = json.loads(e.data)
+            cols = int(data.get("cols", 80))
+            rows = int(data.get("rows", 24))
+            if active_engine == "Local OS PTY":
+                if HAS_POSIX_PTY and pty_master_fd is not None and cols > 0 and rows > 0:
+                    winsize = struct.pack("HHHH", rows, cols, 0, 0)
+                    fcntl.ioctl(pty_master_fd, termios.TIOCSWINSZ, winsize)
+                elif HAS_WIN_PTY and pty_process is not None and cols > 0 and rows > 0:
+                    pty_process.set_size(cols, rows)
+        except Exception as ex:
+            print(f"[Resize Error] {ex}")
+
+    terminal.on_resize = handle_resize
+
+    # PTY setup and cleanup functions
+    def start_posix_pty():
+        nonlocal pty_master_fd
+        master_fd, slave_fd = pty.openpty()
+        pid = os.fork()
+        if pid == 0:
+            os.setsid()
+            os.dup2(slave_fd, 0)
+            os.dup2(slave_fd, 1)
+            os.dup2(slave_fd, 2)
+            if slave_fd > 2:
+                os.close(slave_fd)
+            os.close(master_fd)
+            shell = os.environ.get("SHELL", "/bin/bash")
+            os.execv(shell, [shell, "-l"])
+        else:
+            os.close(slave_fd)
+            pty_master_fd = master_fd
+
+            def read_loop():
+                while pty_master_fd == master_fd:
+                    try:
+                        data = os.read(master_fd, 4096)
+                        if not data:
+                            break
+                        terminal.send_bytes(data)
+                    except OSError:
+                        break
+
+            threading.Thread(target=read_loop, daemon=True).start()
+
+    def start_win_pty():
+        nonlocal pty_process
+        if HAS_WIN_PTY:
+            pty_process = winpty.PtyProcess.spawn("powershell.exe")
+
+            def read_loop():
+                while pty_process is not None:
+                    try:
+                        data = pty_process.read()
+                        if not data or pty_process.isalive() is False:
+                            break
+                        terminal.send_bytes(data.encode("utf-8", errors="ignore"))
+                    except Exception:
+                        break
+
+            threading.Thread(target=read_loop, daemon=True).start()
+
+    def stop_pty():
+        nonlocal pty_master_fd, pty_process
+        if pty_master_fd is not None:
+            try:
+                os.close(pty_master_fd)
+            except Exception:
+                pass
+            pty_master_fd = None
+        if pty_process is not None:
+            try:
+                pty_process.close()
+            except Exception:
+                pass
+            pty_process = None
+
+    # Engine switching logic
+    def switch_engine(e):
+        nonlocal active_engine
+        selected = e.control.value
+        if selected == "Local OS PTY":
+            if not HAS_POSIX_PTY and not HAS_WIN_PTY:
+                page.show_snack_bar(ft.SnackBar(ft.Text("⚠️ Local PTY is unavailable on Web/Android sandbox or unconfigured OS."), bgcolor="#F38BA8"))
+                e.control.value = "ANSI Demo Engine"
+                page.update()
+                return
+            active_engine = "Local OS PTY"
+            engine_status_text.value = f"⚡ Active Engine: Local OS PTY ({'POSIX shell' if HAS_POSIX_PTY else 'WinPTY PowerShell'})"
+            terminal.clear()
+            stop_pty()
+            if HAS_POSIX_PTY:
+                start_posix_pty()
+            elif HAS_WIN_PTY:
+                start_win_pty()
+        else:
+            active_engine = "ANSI Demo Engine"
+            engine_status_text.value = "⚡ Active Engine: ANSI VT100 Demo Engine"
+            stop_pty()
+            terminal.clear()
+            terminal.write("\x1b[1;36m=== FletTerminal VT100/ANSI Demo Engine Active ===\x1b[0m\r\nType commands or use test buttons above.\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
+        page.update()
+
+    # Test Button actions for Demo Engine
+    def run_ansi_matrix(e):
+        terminal.write("\r\n\x1b[1;33m--- ANSI Color & Formatting Matrix ---\x1b[0m\r\n")
+        terminal.write("Styles: \x1b[1mBold\x1b[0m | \x1b[3mItalic\x1b[0m | \x1b[4mUnderline\x1b[0m | \x1b[7mInvert\x1b[0m\r\n")
+        for i in range(8):
+            terminal.write(f"\x1b[3{i}mNormal {i}\x1b[0m  \x1b[1;3{i}mBright {i}\x1b[0m  \x1b[4{i};30m Bg {i} \x1b[0m\r\n")
+        terminal.write("\x1b[32m[Demo Shell]>\x1b[0m ")
+
+    def run_stress_test(e):
+        terminal.write("\r\n\x1b[1;35m--- Starting 10,000 Line High-Throughput Stress Test ---\x1b[0m\r\n")
+        for i in range(1, 10001):
+            color = 30 + (i % 7)
+            terminal.write(f"\x1b[{color}m[Stress Benchmark] Log Entry #{i:05d}: FletTerminal ring-buffer memory throughput validation check.\x1b[0m\r\n")
+        terminal.write("\x1b[1;32m--- Stress Test Completed Successfully! Check scrollback ring buffer. ---\x1b[0m\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
+
+    def run_alternate_screen_test(e):
+        terminal.write("\x1b[?1049h\x1b[H\x1b[2J")  # Switch to alt buffer & clear
+        terminal.write("\x1b[1;36m╔══════════════════════════════════════════════════════════════════════════════╗\r\n")
+        terminal.write("║       FletTerminal Alternate Screen Buffer Simulation (htop / vim mode)      ║\r\n")
+        terminal.write("╠══════════════════════════════════════════════════════════════════════════════╣\r\n")
+        terminal.write("║  CPU1 [|||||||||||||||||||||||||||||||||||||||||||          76.4%]           ║\r\n")
+        terminal.write("║  CPU2 [||||||||||||||||||||||||||||                         42.1%]           ║\r\n")
+        terminal.write("║  Mem  [|||||||||||||||||||||||||||||||||||||||||||||||||    3.8G/8.0G]       ║\r\n")
+        terminal.write("║                                                                              ║\r\n")
+        terminal.write("║  Notice how live terminal state is isolated inside alternate buffer (\x1b[?1049h).  ║\r\n")
+        terminal.write("║  Pressing Exit below sends \x1b[?1049l to restore primary scrollback seamlessly! ║\r\n")
+        terminal.write("╚══════════════════════════════════════════════════════════════════════════════╝\r\n")
+        
+        def restore_screen():
+            time.sleep(3.5)
+            terminal.write("\x1b[?1049l\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
+            
+        threading.Thread(target=restore_screen, daemon=True).start()
+
+    def trigger_osc_bell(e):
+        terminal.write("\x1b]0;OSC 0 Title Update Test\a")
+        terminal.write("\a")  # Bell
+        terminal.write("\r\n\x1b[33mSent window title change (OSC 0) and bell notification (\a)!\x1b[0m\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
+
+    # Accessory Controls
+    def change_cursor_style(e):
+        terminal.cursor_style = e.control.value.lower()
+        terminal.update()
+
+    def toggle_cursor_blink(e):
+        terminal.cursor_blink = e.control.value
+        terminal.update()
+
+    def change_theme(e):
+        nonlocal active_theme_name
+        active_theme_name = e.control.value
+        terminal.theme = themes[active_theme_name]
+        terminal.update()
+
+    def zoom_in(e):
+        terminal.font_size += 1.0
+        terminal.update()
+
+    def zoom_out(e):
+        if terminal.font_size > 8.0:
+            terminal.font_size -= 1.0
+            terminal.update()
+
+    # Search Bar handler
+    search_field = ft.TextField(
+        hint_text="Search in scrollback...",
+        height=32,
+        text_size=12,
+        content_padding=ft.Padding(10, 4, 10, 4),
+        expand=True,
+        bgcolor="#1E1E2E",
+        border_color="#45475A",
+    )
+
+    def do_search(e):
+        if search_field.value:
+            terminal.search(search_field.value)
+
+    # Initial greeting in terminal
+    terminal.write("\x1b[1;36m========================================================================\x1b[0m\r\n")
+    terminal.write("\x1b[1;32m  FletTerminal v0.1.0 Studio — Native GPU-Accelerated Terminal Control  \x1b[0m\r\n")
+    terminal.write("\x1b[1;36m========================================================================\x1b[0m\r\n")
+    terminal.write(f"Target OS: \x1b[33m{sys.platform.upper()}\x1b[0m | POSIX PTY: \x1b[33m{HAS_POSIX_PTY}\x1b[0m | Windows ConPTY: \x1b[33m{HAS_WIN_PTY}\x1b[0m\r\n")
+    terminal.write("Use the controls above to test themes, high-throughput streaming, and local PTYs.\r\n")
+    terminal.write("\x1b[32m[Demo Shell]>\x1b[0m ")
+
+    page.add(
+        ft.Container(
+            content=ft.Column(
+                controls=[
+                    # Header bar
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                ft.Text("🚀 FletTerminal Studio", size=16, weight=ft.FontWeight.BOLD, color="#CDD6F4"),
+                                ft.Container(width=16),
+                                engine_status_text,
+                                ft.Container(expand=True),
+                                os_status_text,
+                            ]
+                        ),
+                        padding=ft.Padding(16, 12, 16, 12),
+                        bgcolor="#181825",
+                        border=ft.border.only(bottom=ft.border.BorderSide(1, "#313244")),
+                    ),
+                    # Toolbar / Engine & Tests selector
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                ft.Text("Engine:", size=12, color="#BAC2DE"),
+                                ft.Dropdown(
+                                    options=[
+                                        ft.dropdown.Option("ANSI Demo Engine"),
+                                        ft.dropdown.Option("Local OS PTY"),
+                                    ],
+                                    value="ANSI Demo Engine",
+                                    height=34,
+                                    width=160,
+                                    text_size=12,
+                                    on_change=switch_engine,
+                                ),
+                                ft.Container(width=12),
+                                ft.Text("Benchmarks:", size=12, color="#BAC2DE"),
+                                ft.ElevatedButton("🎨 Color Matrix", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=run_ansi_matrix),
+                                ft.ElevatedButton("🚀 10k Line Stress", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=run_stress_test),
+                                ft.ElevatedButton("🖥️ Alt Screen (htop)", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=run_alternate_screen_test),
+                                ft.ElevatedButton("🔔 Bell & Title", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=trigger_osc_bell),
+                            ],
+                            wrap=True,
+                        ),
+                        padding=ft.Padding(16, 8, 16, 8),
+                        bgcolor="#1E1E2E",
+                    ),
+                    # Customization & Search bar
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                ft.Text("Theme:", size=12, color="#BAC2DE"),
+                                ft.Dropdown(
+                                    options=[ft.dropdown.Option(k) for k in themes.keys()],
+                                    value=active_theme_name,
+                                    height=34,
+                                    width=140,
+                                    text_size=12,
+                                    on_change=change_theme,
+                                ),
+                                ft.Container(width=12),
+                                ft.Text("Cursor:", size=12, color="#BAC2DE"),
+                                ft.Dropdown(
+                                    options=[
+                                        ft.dropdown.Option("Block"),
+                                        ft.dropdown.Option("Underline"),
+                                        ft.dropdown.Option("Bar"),
+                                    ],
+                                    value="Block",
+                                    height=34,
+                                    width=110,
+                                    text_size=12,
+                                    on_change=change_cursor_style,
+                                ),
+                                ft.Checkbox(label="Blink", value=True, on_change=toggle_cursor_blink),
+                                ft.Container(width=12),
+                                ft.IconButton(ft.Icons.ZOOM_OUT, icon_size=18, tooltip="Zoom Out", on_click=zoom_out),
+                                ft.IconButton(ft.Icons.ZOOM_IN, icon_size=18, tooltip="Zoom In", on_click=zoom_in),
+                                ft.Container(width=12),
+                                search_field,
+                                ft.IconButton(ft.Icons.SEARCH, icon_size=18, tooltip="Search", on_click=do_search),
+                                ft.Container(width=12),
+                                title_status_text,
+                            ]
+                        ),
+                        padding=ft.Padding(16, 8, 16, 8),
+                        bgcolor="#181825",
+                        border=ft.border.only(bottom=ft.border.BorderSide(1, "#313244")),
+                    ),
+                    # Main Terminal Canvas
+                    terminal,
+                ],
+                spacing=0,
+                expand=True,
+            ),
+            expand=True,
+        )
+    )
+
+
+if __name__ == "__main__":
+    ft.app(target=main)

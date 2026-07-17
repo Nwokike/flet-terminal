@@ -1,0 +1,27 @@
+[project]
+name = "flet-terminal"
+version = "0.1.0"
+description = "Native GPU-accelerated Terminal control for Flet using xterm.dart"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Onyeka Nwokike", email = "nwokikeonyeka@gmail.com" }
+]
+dependencies = [
+    "flet>=0.86.0",
+]
+
+[project.urls]
+Repository = "https://github.com/Nwokike/flet-terminal"
+Homepage = "https://github.com/Nwokike/flet-terminal"
+Issues = "https://github.com/Nwokike/flet-terminal/issues"
+
+[tool.setuptools.package-data]
+"flutter.flet_terminal" = ["**/*"]
+
+[tool.setuptools]
+license-files = []
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
