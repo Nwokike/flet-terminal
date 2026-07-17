@@ -5,7 +5,7 @@ description = "Cross-Platform Studio & Example app for flet-terminal"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "flet-terminal @ file://${PROJECT_ROOT}/../..",
+    "flet-terminal",
     "flet>=0.86.0",
 ]
 
@@ -17,5 +17,8 @@ build_number = 1
 [tool.flet.app]
 path = "src"
 
-[tool.uv]
-dev-dependencies = []
+[tool.uv.sources]
+flet-terminal = { path = "../..", editable = true }
+
+[dependency-groups]
+dev = []

@@ -21,3 +21,4 @@ build/
 # Flet / OS
 .DS_Store
 *.log
+wheels/

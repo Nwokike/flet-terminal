@@ -5,9 +5,6 @@ import 'package:flet/flet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart' as qt;
-import 'package:xterm/flutter.dart' as qtf;
-import 'package:xterm/src/core/buffer/cell_offset.dart';
-import 'package:xterm/src/core/buffer/range_line.dart';
 
 class FletTerminalControl extends StatefulWidget {
   final Control control;
@@ -24,6 +21,7 @@ class FletTerminalControl extends StatefulWidget {
 class _FletTerminalControlState extends State<FletTerminalControl> {
   late final qt.Terminal _terminal;
   final qt.TerminalController _terminalController = qt.TerminalController();
+  final FocusNode _focusNode = FocusNode();
   late final DataChannel _channel;
   StreamSubscription<Uint8List>? _channelSub;
 
@@ -132,20 +130,26 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     } else if (name == "clear") {
       if (mounted) {
         setState(() {
-          _terminal.clear();
+          _terminal.buffer.clearScrollback();
+          _terminal.buffer.clear();
         });
       }
     } else if (name == "focus") {
-      _terminalController.setFocus();
+      _focusNode.requestFocus();
     } else if (name == "clear_selection") {
       _terminalController.clearSelection();
     } else if (name == "select_all") {
       if (mounted) {
         _terminalController.setSelection(
-          BufferRangeLine(
-            CellOffset(0, 0),
-            CellOffset(_terminal.viewWidth, _terminal.buffer.height - 1),
+          _terminal.buffer.createAnchor(
+            0,
+            _terminal.buffer.height - _terminal.viewHeight,
           ),
+          _terminal.buffer.createAnchor(
+            _terminal.viewWidth,
+            _terminal.buffer.height - 1,
+          ),
+          mode: qt.SelectionMode.line,
         );
       }
     } else if (name == "search") {
@@ -164,7 +168,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   }
 
   qt.TerminalTheme _parseTheme(Map<dynamic, dynamic>? themeProps) {
-    const d = qtf.TerminalThemes.defaultTheme;
+    const d = qt.TerminalThemes.defaultTheme;
     if (themeProps == null) return d;
 
     Color parseColor(String key, Color fallback) {
@@ -222,15 +226,16 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     );
   }
 
-  qtf.TerminalCursorType _parseCursorType(String? type) {
-    if (type == "underline") return qtf.TerminalCursorType.underline;
-    if (type == "bar" || type == "verticalBar") return qtf.TerminalCursorType.verticalBar;
-    return qtf.TerminalCursorType.block;
+  qt.TerminalCursorType _parseCursorType(String? type) {
+    if (type == "underline") return qt.TerminalCursorType.underline;
+    if (type == "bar" || type == "verticalBar") return qt.TerminalCursorType.verticalBar;
+    return qt.TerminalCursorType.block;
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = _parseTheme(widget.control.getMap("theme"));
+    final themeMap = widget.control.get<Map>("theme") ?? (widget.control.properties["theme"] as Map?);
+    final theme = _parseTheme(themeMap);
     final style = _parseStyle();
     final cursorType = _parseCursorType(widget.control.getString("cursor_style"));
     final cursorBlink = widget.control.getBool("cursor_blink", true)!;
@@ -240,9 +245,10 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     final media = MediaQuery.of(context);
     final isMobile = media.size.width < 600;
 
-    Widget termView = qtf.TerminalView(
+    Widget termView = qt.TerminalView(
       _terminal,
       controller: _terminalController,
+      focusNode: _focusNode,
       theme: theme,
       textStyle: style,
       autofocus: autofocus,
@@ -266,6 +272,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     widget.control.removeInvokeMethodListener(_handleMethodCall);
     _channelSub?.cancel();
     _channel.close();
+    _focusNode.dispose();
     _terminalController.dispose();
     super.dispose();
   }

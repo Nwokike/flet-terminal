@@ -5,13 +5,13 @@ publish_to: none
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
-  flutter: ">=1.17.0"
+  flutter: ">=3.10.0"
 
 dependencies:
   flet: ^0.86.0
   flutter:
     sdk: flutter
-  xterm: ^3.5.0
+  xterm: ^4.0.0
 
 dev_dependencies:
   flutter_test:
