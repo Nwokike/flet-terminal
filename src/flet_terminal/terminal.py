@@ -13,29 +13,29 @@ class Terminal(ft.LayoutControl):
     Provides full xterm.js feature parity across Windows, Linux, macOS, Android, and Web.
     """
 
-    scrollback: Optional[int] = ft.field(default=10000)
-    font_family: Optional[str] = ft.field(default="JetBrains Mono")
-    font_size: Optional[float] = ft.field(default=13.0)
-    cursor_blink: Optional[bool] = ft.field(default=True)
-    cursor_style: Optional[str] = ft.field(default="block")  # "block", "underline", "bar"
-    theme: Optional[dict[str, Any]] = ft.field(default=None)
-    read_only: Optional[bool] = ft.field(default=False)
-    auto_focus: Optional[bool] = ft.field(default=True)
+    scrollback: Optional[int] = 10000
+    font_family: Optional[str] = "JetBrains Mono"
+    font_size: Optional[float] = 13.0
+    cursor_blink: Optional[bool] = True
+    cursor_style: Optional[str] = "block"  # "block", "underline", "bar"
+    theme: Optional[dict[str, Any]] = None
+    read_only: Optional[bool] = False
+    auto_focus: Optional[bool] = True
 
     # Sticky modifier key states (synced bidirectionally with Dart)
-    ctrl_active: Optional[bool] = ft.field(default=False)
-    alt_active: Optional[bool] = ft.field(default=False)
+    ctrl_active: Optional[bool] = False
+    alt_active: Optional[bool] = False
 
     # Standard Flet event handlers
-    on_data: Optional[ft.ControlEventHandler] = ft.field(default=None)
-    on_resize: Optional[ft.ControlEventHandler] = ft.field(default=None)
-    on_modifier_reset: Optional[ft.ControlEventHandler] = ft.field(default=None)
-    on_title_change: Optional[ft.ControlEventHandler] = ft.field(default=None)
-    on_bell: Optional[ft.ControlEventHandler] = ft.field(default=None)
-    on_selection_change: Optional[ft.ControlEventHandler] = ft.field(default=None)
+    on_data: Optional[ft.ControlEventHandler] = None
+    on_resize: Optional[ft.ControlEventHandler] = None
+    on_modifier_reset: Optional[ft.ControlEventHandler] = None
+    on_title_change: Optional[ft.ControlEventHandler] = None
+    on_bell: Optional[ft.ControlEventHandler] = None
+    on_selection_change: Optional[ft.ControlEventHandler] = None
 
     # Internal channel setup handler
-    on_data_channel_open: Optional[ft.EventHandler[DataChannelOpenEvent]] = ft.field(default=None)
+    on_data_channel_open: Optional[ft.EventHandler[DataChannelOpenEvent]] = None
 
     def init(self):
         self._channel: Optional[DataChannel] = None
