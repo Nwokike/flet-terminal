@@ -330,14 +330,6 @@ def main(page: ft.Page):
         if search_field.value:
             terminal.search(search_field.value)
 
-    # Initial greeting in terminal
-    terminal.write("\x1b[1;36m========================================================================\x1b[0m\r\n")
-    terminal.write("\x1b[1;32m  FletTerminal v0.1.0 Studio — Native GPU-Accelerated Terminal Control  \x1b[0m\r\n")
-    terminal.write("\x1b[1;36m========================================================================\x1b[0m\r\n")
-    terminal.write(f"Target OS: \x1b[33m{sys.platform.upper()}\x1b[0m | POSIX PTY: \x1b[33m{HAS_POSIX_PTY}\x1b[0m | Windows ConPTY: \x1b[33m{HAS_WIN_PTY}\x1b[0m\r\n")
-    terminal.write("Use the controls above to test themes, high-throughput streaming, and local PTYs.\r\n")
-    terminal.write("\x1b[32m[Demo Shell]>\x1b[0m ")
-
     page.add(
         ft.Container(
             content=ft.Column(
@@ -437,6 +429,14 @@ def main(page: ft.Page):
         )
     )
 
+    # Initial greeting in terminal right after control is added to page
+    terminal.write("\x1b[1;36m========================================================================\x1b[0m\r\n")
+    terminal.write("\x1b[1;32m  FletTerminal v0.1.0 Studio — Native GPU-Accelerated Terminal Control  \x1b[0m\r\n")
+    terminal.write("\x1b[1;36m========================================================================\x1b[0m\r\n")
+    terminal.write(f"Target OS: \x1b[33m{sys.platform.upper()}\x1b[0m | POSIX PTY: \x1b[33m{HAS_POSIX_PTY}\x1b[0m | Windows ConPTY: \x1b[33m{HAS_WIN_PTY}\x1b[0m\r\n")
+    terminal.write("Use the controls above to test themes, high-throughput streaming, and local PTYs.\r\n")
+    terminal.write("\x1b[32m[Demo Shell]>\x1b[0m ")
+
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.run(main)

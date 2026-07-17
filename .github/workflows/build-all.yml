@@ -72,8 +72,7 @@ jobs:
       - name: Pre-compile binary wheels
         run: |
           mkdir -p wheels
-          pip install wheel build
-          python -m build --wheel --outdir wheels/ .
+          uv build --wheel --out-dir wheels/ .
       - name: Build Web PWA
         env:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
@@ -104,8 +103,7 @@ jobs:
       - name: Pre-compile binary wheels
         run: |
           mkdir -p wheels
-          pip install wheel build
-          python -m build --wheel --outdir wheels/ .
+          uv build --wheel --out-dir wheels/ .
       - name: Build Linux Bundle
         env:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
@@ -135,8 +133,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p wheels
-          pip install wheel build
-          python -m build --wheel --outdir wheels/ .
+          uv build --wheel --out-dir wheels/ .
       - name: Build Windows Executable
         shell: bash
         env:
@@ -174,8 +171,7 @@ jobs:
       - name: Pre-compile binary wheels
         run: |
           mkdir -p wheels
-          pip install wheel build
-          python -m build --wheel --outdir wheels/ .
+          uv build --wheel --out-dir wheels/ .
       - name: Build Android APK (split per ABI)
         env:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels

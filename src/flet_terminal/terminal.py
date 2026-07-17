@@ -43,6 +43,16 @@ class Terminal(ft.LayoutControl):
         if self.on_data_channel_open is None:
             self.on_data_channel_open = self._handle_data_channel_open
         self._on_unmount_callback = None
+        self._pending_writes: list[Any] = []
+
+    def did_mount(self):
+        super().did_mount()
+        while self._pending_writes:
+            task_fn, args = self._pending_writes.pop(0)
+            if args is not None:
+                self.page.run_task(task_fn, *args)
+            else:
+                self.page.run_task(task_fn)
 
     def _handle_data_channel_open(self, e: DataChannelOpenEvent):
         if e.channel_name == "pty" or not self._channel:
@@ -74,49 +84,127 @@ class Terminal(ft.LayoutControl):
 
     async def write_async(self, data: str | bytes):
         """Writes text or escape sequences to the terminal via Flet method invocation."""
+        try:
+            if not self.page:
+                self._pending_writes.append((self.write_async, (data,)))
+                return
+        except RuntimeError:
+            self._pending_writes.append((self.write_async, (data,)))
+            return
         payload = data if isinstance(data, str) else data.decode("utf-8", errors="ignore")
         await self._invoke_method("write", {"data": payload})
 
     def write(self, data: str | bytes):
         """Synchronous wrapper for write_async."""
-        self.page.run_task(self.write_async, data)
+        try:
+            if not self.page:
+                self._pending_writes.append((self.write_async, (data,)))
+                return
+            self.page.run_task(self.write_async, data)
+        except RuntimeError:
+            self._pending_writes.append((self.write_async, (data,)))
 
     async def clear_async(self):
         """Clears the terminal scrollback and buffer."""
+        try:
+            if not self.page:
+                self._pending_writes.append((self.clear_async, None))
+                return
+        except RuntimeError:
+            self._pending_writes.append((self.clear_async, None))
+            return
         await self._invoke_method("clear")
 
     def clear(self):
         """Synchronous wrapper for clear_async."""
-        self.page.run_task(self.clear_async)
+        try:
+            if not self.page:
+                self._pending_writes.append((self.clear_async, None))
+                return
+            self.page.run_task(self.clear_async)
+        except RuntimeError:
+            self._pending_writes.append((self.clear_async, None))
 
     async def focus_async(self):
         """Requests keyboard focus on the terminal."""
+        try:
+            if not self.page:
+                self._pending_writes.append((self.focus_async, None))
+                return
+        except RuntimeError:
+            self._pending_writes.append((self.focus_async, None))
+            return
         await self._invoke_method("focus")
 
     def focus(self):
         """Synchronous wrapper for focus_async."""
-        self.page.run_task(self.focus_async)
+        try:
+            if not self.page:
+                self._pending_writes.append((self.focus_async, None))
+                return
+            self.page.run_task(self.focus_async)
+        except RuntimeError:
+            self._pending_writes.append((self.focus_async, None))
 
     async def search_async(self, query: str):
         """Searches for text within the terminal scrollback ring buffer."""
+        try:
+            if not self.page:
+                self._pending_writes.append((self.search_async, (query,)))
+                return
+        except RuntimeError:
+            self._pending_writes.append((self.search_async, (query,)))
+            return
         await self._invoke_method("search", {"query": query})
 
     def search(self, query: str):
         """Synchronous wrapper for search_async."""
-        self.page.run_task(self.search_async, query)
+        try:
+            if not self.page:
+                self._pending_writes.append((self.search_async, (query,)))
+                return
+            self.page.run_task(self.search_async, query)
+        except RuntimeError:
+            self._pending_writes.append((self.search_async, (query,)))
 
     async def clear_selection_async(self):
         """Clears any active text selection in the terminal."""
+        try:
+            if not self.page:
+                self._pending_writes.append((self.clear_selection_async, None))
+                return
+        except RuntimeError:
+            self._pending_writes.append((self.clear_selection_async, None))
+            return
         await self._invoke_method("clear_selection")
 
     def clear_selection(self):
         """Synchronous wrapper for clear_selection_async."""
-        self.page.run_task(self.clear_selection_async)
+        try:
+            if not self.page:
+                self._pending_writes.append((self.clear_selection_async, None))
+                return
+            self.page.run_task(self.clear_selection_async)
+        except RuntimeError:
+            self._pending_writes.append((self.clear_selection_async, None))
 
     async def select_all_async(self):
         """Selects all text currently in the terminal buffer and scrollback."""
+        try:
+            if not self.page:
+                self._pending_writes.append((self.select_all_async, None))
+                return
+        except RuntimeError:
+            self._pending_writes.append((self.select_all_async, None))
+            return
         await self._invoke_method("select_all")
 
     def select_all(self):
         """Synchronous wrapper for select_all_async."""
-        self.page.run_task(self.select_all_async)
+        try:
+            if not self.page:
+                self._pending_writes.append((self.select_all_async, None))
+                return
+            self.page.run_task(self.select_all_async)
+        except RuntimeError:
+            self._pending_writes.append((self.select_all_async, None))
