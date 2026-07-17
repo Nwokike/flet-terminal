@@ -4,7 +4,6 @@ Tests FletTerminal across Web, Linux, Windows, and Android with built-in
 VT100/ANSI stress testing engines and local OS PTY integration (`bash` / `PowerShell`).
 """
 
-import asyncio
 import json
 import os
 import struct
@@ -14,19 +13,32 @@ import time
 import flet as ft
 from flet_terminal import Terminal
 
-# Try importing POSIX pty (Linux/macOS)
+# Try importing POSIX pty (Linux/macOS desktop/server only)
 try:
-    import fcntl
-    import pty
-    import termios
-    HAS_POSIX_PTY = True
+    if sys.platform in ("emscripten", "wasi", "win32", "android"):
+        HAS_POSIX_PTY = False
+    else:
+        import fcntl
+        import pty
+        import termios
+        # Verify openpty actually works in this environment (in case of sandboxed OS)
+        try:
+            _m, _s = pty.openpty()
+            os.close(_m)
+            os.close(_s)
+            HAS_POSIX_PTY = True
+        except OSError:
+            HAS_POSIX_PTY = False
 except ImportError:
     HAS_POSIX_PTY = False
 
 # Try importing Windows ConPTY (pywinpty)
 try:
-    import winpty
-    HAS_WIN_PTY = True
+    if sys.platform in ("emscripten", "wasi"):
+        HAS_WIN_PTY = False
+    else:
+        import winpty
+        HAS_WIN_PTY = True
 except ImportError:
     HAS_WIN_PTY = False
 
@@ -100,7 +112,6 @@ def main(page: ft.Page):
     active_engine = "ANSI Demo Engine"
     pty_master_fd = None
     pty_process = None
-    pty_thread = None
 
     # Status Bar indicators
     engine_status_text = ft.Text("⚡ Active Engine: ANSI VT100 Demo Engine", size=12, weight=ft.FontWeight.BOLD, color="#A6E3A1")
@@ -113,7 +124,7 @@ def main(page: ft.Page):
         page.update()
 
     def handle_bell(e):
-        page.show_snack_bar(ft.SnackBar(ft.Text("🔔 Terminal Bell Triggered! (\a)"), bgcolor="#F38BA8", duration=1500))
+        page.show_dialog(ft.SnackBar(ft.Text("🔔 Terminal Bell Triggered! (\a)"), bgcolor="#F38BA8", duration=1500))
 
     terminal.on_title_change = handle_title_change
     terminal.on_bell = handle_bell
@@ -145,15 +156,13 @@ def main(page: ft.Page):
 
     terminal.set_on_bytes(handle_terminal_bytes)
 
-    # Handle resizing
     def handle_resize(e):
-        nonlocal pty_master_fd, pty_process
         try:
             data = json.loads(e.data)
             cols = int(data.get("cols", 80))
             rows = int(data.get("rows", 24))
             if active_engine == "Local OS PTY":
-                if HAS_POSIX_PTY and pty_master_fd is not None and cols > 0 and rows > 0:
+                if pty_master_fd is not None and HAS_POSIX_PTY:
                     winsize = struct.pack("HHHH", rows, cols, 0, 0)
                     fcntl.ioctl(pty_master_fd, termios.TIOCSWINSZ, winsize)
                 elif HAS_WIN_PTY and pty_process is not None and cols > 0 and rows > 0:
@@ -165,51 +174,69 @@ def main(page: ft.Page):
 
     # PTY setup and cleanup functions
     def start_posix_pty():
-        nonlocal pty_master_fd
-        master_fd, slave_fd = pty.openpty()
-        pid = os.fork()
-        if pid == 0:
-            os.setsid()
-            os.dup2(slave_fd, 0)
-            os.dup2(slave_fd, 1)
-            os.dup2(slave_fd, 2)
-            if slave_fd > 2:
+        nonlocal pty_master_fd, active_engine
+        try:
+            master_fd, slave_fd = pty.openpty()
+            pid = os.fork()
+            if pid == 0:
+                os.setsid()
+                os.dup2(slave_fd, 0)
+                os.dup2(slave_fd, 1)
+                os.dup2(slave_fd, 2)
+                if slave_fd > 2:
+                    os.close(slave_fd)
+                os.close(master_fd)
+                shell = os.environ.get("SHELL", "/bin/bash")
+                os.execv(shell, [shell, "-l"])
+            else:
                 os.close(slave_fd)
-            os.close(master_fd)
-            shell = os.environ.get("SHELL", "/bin/bash")
-            os.execv(shell, [shell, "-l"])
-        else:
-            os.close(slave_fd)
-            pty_master_fd = master_fd
+                pty_master_fd = master_fd
 
-            def read_loop():
-                while pty_master_fd == master_fd:
-                    try:
-                        data = os.read(master_fd, 4096)
-                        if not data:
+                def read_loop():
+                    while pty_master_fd == master_fd:
+                        try:
+                            data = os.read(master_fd, 4096)
+                            if not data:
+                                break
+                            terminal.send_bytes(data)
+                        except OSError:
                             break
-                        terminal.send_bytes(data)
-                    except OSError:
-                        break
 
-            threading.Thread(target=read_loop, daemon=True).start()
+                threading.Thread(target=read_loop, daemon=True).start()
+        except (OSError, AttributeError, Exception) as ex:
+            page.show_dialog(ft.SnackBar(ft.Text(f"⚠️ Local PTY failed to start: {ex}. Reverting to Demo Engine."), bgcolor="#F38BA8"))
+            active_engine = "ANSI Demo Engine"
+            engine_status_text.value = "⚡ Active Engine: ANSI VT100 Demo Engine"
+            stop_pty()
+            terminal.clear()
+            terminal.write(f"\r\n\x1b[1;31m[PTY Error]\x1b[0m Local OS PTY is not available in this environment ({ex}).\r\nSwitched to ANSI VT100 Demo Engine.\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
+            page.update()
 
     def start_win_pty():
-        nonlocal pty_process
+        nonlocal pty_process, active_engine
         if HAS_WIN_PTY:
-            pty_process = winpty.PtyProcess.spawn("powershell.exe")
+            try:
+                pty_process = winpty.PtyProcess.spawn("powershell.exe")
 
-            def read_loop():
-                while pty_process is not None:
-                    try:
-                        data = pty_process.read()
-                        if not data or pty_process.isalive() is False:
+                def read_loop():
+                    while pty_process is not None:
+                        try:
+                            data = pty_process.read()
+                            if not data or pty_process.isalive() is False:
+                                break
+                            terminal.send_bytes(data.encode("utf-8", errors="ignore"))
+                        except Exception:
                             break
-                        terminal.send_bytes(data.encode("utf-8", errors="ignore"))
-                    except Exception:
-                        break
 
-            threading.Thread(target=read_loop, daemon=True).start()
+                threading.Thread(target=read_loop, daemon=True).start()
+            except Exception as ex:
+                page.show_dialog(ft.SnackBar(ft.Text(f"⚠️ WinPTY failed to start: {ex}. Reverting to Demo Engine."), bgcolor="#F38BA8"))
+                active_engine = "ANSI Demo Engine"
+                engine_status_text.value = "⚡ Active Engine: ANSI VT100 Demo Engine"
+                stop_pty()
+                terminal.clear()
+                terminal.write(f"\r\n\x1b[1;31m[PTY Error]\x1b[0m WinPTY is not available ({ex}).\r\nSwitched to ANSI VT100 Demo Engine.\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
+                page.update()
 
     def stop_pty():
         nonlocal pty_master_fd, pty_process
@@ -232,7 +259,7 @@ def main(page: ft.Page):
         selected = e.control.value
         if selected == "Local OS PTY":
             if not HAS_POSIX_PTY and not HAS_WIN_PTY:
-                page.show_snack_bar(ft.SnackBar(ft.Text("⚠️ Local PTY is unavailable on Web/Android sandbox or unconfigured OS."), bgcolor="#F38BA8"))
+                page.show_dialog(ft.SnackBar(ft.Text("⚠️ Local PTY is unavailable on Web/Android sandbox or unconfigured OS."), bgcolor="#F38BA8"))
                 e.control.value = "ANSI Demo Engine"
                 page.update()
                 return
@@ -347,7 +374,7 @@ def main(page: ft.Page):
                         ),
                         padding=ft.Padding(16, 12, 16, 12),
                         bgcolor="#181825",
-                        border=ft.border.only(bottom=ft.border.BorderSide(1, "#313244")),
+                        border=ft.Border.only(bottom=ft.BorderSide(1, "#313244")),
                     ),
                     # Toolbar / Engine & Tests selector
                     ft.Container(
@@ -363,14 +390,14 @@ def main(page: ft.Page):
                                     height=34,
                                     width=160,
                                     text_size=12,
-                                    on_change=switch_engine,
+                                    on_select=switch_engine,
                                 ),
                                 ft.Container(width=12),
                                 ft.Text("Benchmarks:", size=12, color="#BAC2DE"),
-                                ft.ElevatedButton("🎨 Color Matrix", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=run_ansi_matrix),
-                                ft.ElevatedButton("🚀 10k Line Stress", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=run_stress_test),
-                                ft.ElevatedButton("🖥️ Alt Screen (htop)", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=run_alternate_screen_test),
-                                ft.ElevatedButton("🔔 Bell & Title", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=trigger_osc_bell),
+                                ft.Button("🎨 Color Matrix", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=run_ansi_matrix),
+                                ft.Button("🚀 10k Line Stress", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=run_stress_test),
+                                ft.Button("🖥️ Alt Screen (htop)", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=run_alternate_screen_test),
+                                ft.Button("🔔 Bell & Title", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=trigger_osc_bell),
                             ],
                             wrap=True,
                         ),
@@ -388,7 +415,7 @@ def main(page: ft.Page):
                                     height=34,
                                     width=140,
                                     text_size=12,
-                                    on_change=change_theme,
+                                    on_select=change_theme,
                                 ),
                                 ft.Container(width=12),
                                 ft.Text("Cursor:", size=12, color="#BAC2DE"),
@@ -402,7 +429,7 @@ def main(page: ft.Page):
                                     height=34,
                                     width=110,
                                     text_size=12,
-                                    on_change=change_cursor_style,
+                                    on_select=change_cursor_style,
                                 ),
                                 ft.Checkbox(label="Blink", value=True, on_change=toggle_cursor_blink),
                                 ft.Container(width=12),
@@ -417,7 +444,7 @@ def main(page: ft.Page):
                         ),
                         padding=ft.Padding(16, 8, 16, 8),
                         bgcolor="#181825",
-                        border=ft.border.only(bottom=ft.border.BorderSide(1, "#313244")),
+                        border=ft.Border.only(bottom=ft.BorderSide(1, "#313244")),
                     ),
                     # Main Terminal Canvas
                     terminal,

@@ -21,4 +21,6 @@ path = "src"
 flet-terminal = { path = "../..", editable = true }
 
 [dependency-groups]
-dev = []
+dev = [
+    "ruff>=0.15.22",
+]

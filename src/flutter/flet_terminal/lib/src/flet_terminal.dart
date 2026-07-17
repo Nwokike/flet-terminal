@@ -29,6 +29,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   void initState() {
     super.initState();
     widget.control.addInvokeMethodListener(_handleMethodCall);
+    widget.control.triggerEvent("mount", "");
 
     final maxLines = widget.control.getInt("scrollback", 10000)!;
     _terminal = qt.Terminal(maxLines: maxLines);

@@ -33,6 +33,7 @@ class Terminal(ft.LayoutControl):
     on_title_change: Optional[ft.ControlEventHandler] = None
     on_bell: Optional[ft.ControlEventHandler] = None
     on_selection_change: Optional[ft.ControlEventHandler] = None
+    on_mount: Optional[ft.ControlEventHandler] = None
 
     # Internal channel setup handler
     on_data_channel_open: Optional[ft.EventHandler[DataChannelOpenEvent]] = None
@@ -42,23 +43,40 @@ class Terminal(ft.LayoutControl):
         self._on_bytes_handler = None
         if self.on_data_channel_open is None:
             self.on_data_channel_open = self._handle_data_channel_open
+        if self.on_mount is None:
+            self.on_mount = self._handle_mount
         self._on_unmount_callback = None
         self._pending_writes: list[Any] = []
+        self._dart_ready: bool = False
 
-    def did_mount(self):
-        super().did_mount()
-        while self._pending_writes:
+    def before_event(self, e: ft.ControlEvent):
+        self._mark_dart_ready()
+        return super().before_event(e)
+
+    def _mark_dart_ready(self):
+        if not self._dart_ready:
+            self._dart_ready = True
+        while self._pending_writes and self.page and self._dart_ready:
             task_fn, args = self._pending_writes.pop(0)
             if args is not None:
                 self.page.run_task(task_fn, *args)
             else:
                 self.page.run_task(task_fn)
 
+    def _handle_mount(self, e):
+        self._mark_dart_ready()
+
+    def did_mount(self):
+        super().did_mount()
+        if self._dart_ready:
+            self._mark_dart_ready()
+
     def _handle_data_channel_open(self, e: DataChannelOpenEvent):
         if e.channel_name == "pty" or not self._channel:
             self._channel = self.get_data_channel(e.channel_id)
             if self._on_bytes_handler:
                 self._channel.on_bytes(self._on_bytes_handler)
+        self._mark_dart_ready()
 
     def set_on_bytes(self, handler):
         """Registers a callback for raw bytes pushed from Dart to Python."""
@@ -68,7 +86,7 @@ class Terminal(ft.LayoutControl):
 
     def send_bytes(self, payload: bytes):
         """Sends raw bytes from Python to Dart (writing to terminal canvas)."""
-        if self._channel:
+        if self._channel and self._dart_ready:
             self._channel.send(payload)
         else:
             self.write(payload)
@@ -76,6 +94,7 @@ class Terminal(ft.LayoutControl):
     def will_unmount(self):
         """Disposes resources and sockets when the terminal control is removed from tree."""
         super().will_unmount()
+        self._dart_ready = False
         if self._on_unmount_callback:
             try:
                 self._on_unmount_callback()
@@ -85,7 +104,7 @@ class Terminal(ft.LayoutControl):
     async def write_async(self, data: str | bytes):
         """Writes text or escape sequences to the terminal via Flet method invocation."""
         try:
-            if not self.page:
+            if not self.page or not self._dart_ready:
                 self._pending_writes.append((self.write_async, (data,)))
                 return
         except RuntimeError:
@@ -97,7 +116,7 @@ class Terminal(ft.LayoutControl):
     def write(self, data: str | bytes):
         """Synchronous wrapper for write_async."""
         try:
-            if not self.page:
+            if not self.page or not self._dart_ready:
                 self._pending_writes.append((self.write_async, (data,)))
                 return
             self.page.run_task(self.write_async, data)
@@ -107,7 +126,7 @@ class Terminal(ft.LayoutControl):
     async def clear_async(self):
         """Clears the terminal scrollback and buffer."""
         try:
-            if not self.page:
+            if not self.page or not self._dart_ready:
                 self._pending_writes.append((self.clear_async, None))
                 return
         except RuntimeError:
@@ -118,7 +137,7 @@ class Terminal(ft.LayoutControl):
     def clear(self):
         """Synchronous wrapper for clear_async."""
         try:
-            if not self.page:
+            if not self.page or not self._dart_ready:
                 self._pending_writes.append((self.clear_async, None))
                 return
             self.page.run_task(self.clear_async)
@@ -128,7 +147,7 @@ class Terminal(ft.LayoutControl):
     async def focus_async(self):
         """Requests keyboard focus on the terminal."""
         try:
-            if not self.page:
+            if not self.page or not self._dart_ready:
                 self._pending_writes.append((self.focus_async, None))
                 return
         except RuntimeError:
@@ -139,7 +158,7 @@ class Terminal(ft.LayoutControl):
     def focus(self):
         """Synchronous wrapper for focus_async."""
         try:
-            if not self.page:
+            if not self.page or not self._dart_ready:
                 self._pending_writes.append((self.focus_async, None))
                 return
             self.page.run_task(self.focus_async)
@@ -149,7 +168,7 @@ class Terminal(ft.LayoutControl):
     async def search_async(self, query: str):
         """Searches for text within the terminal scrollback ring buffer."""
         try:
-            if not self.page:
+            if not self.page or not self._dart_ready:
                 self._pending_writes.append((self.search_async, (query,)))
                 return
         except RuntimeError:
@@ -160,7 +179,7 @@ class Terminal(ft.LayoutControl):
     def search(self, query: str):
         """Synchronous wrapper for search_async."""
         try:
-            if not self.page:
+            if not self.page or not self._dart_ready:
                 self._pending_writes.append((self.search_async, (query,)))
                 return
             self.page.run_task(self.search_async, query)
@@ -170,7 +189,7 @@ class Terminal(ft.LayoutControl):
     async def clear_selection_async(self):
         """Clears any active text selection in the terminal."""
         try:
-            if not self.page:
+            if not self.page or not self._dart_ready:
                 self._pending_writes.append((self.clear_selection_async, None))
                 return
         except RuntimeError:
@@ -181,7 +200,7 @@ class Terminal(ft.LayoutControl):
     def clear_selection(self):
         """Synchronous wrapper for clear_selection_async."""
         try:
-            if not self.page:
+            if not self.page or not self._dart_ready:
                 self._pending_writes.append((self.clear_selection_async, None))
                 return
             self.page.run_task(self.clear_selection_async)
@@ -191,7 +210,7 @@ class Terminal(ft.LayoutControl):
     async def select_all_async(self):
         """Selects all text currently in the terminal buffer and scrollback."""
         try:
-            if not self.page:
+            if not self.page or not self._dart_ready:
                 self._pending_writes.append((self.select_all_async, None))
                 return
         except RuntimeError:
@@ -202,7 +221,7 @@ class Terminal(ft.LayoutControl):
     def select_all(self):
         """Synchronous wrapper for select_all_async."""
         try:
-            if not self.page:
+            if not self.page or not self._dart_ready:
                 self._pending_writes.append((self.select_all_async, None))
                 return
             self.page.run_task(self.select_all_async)
