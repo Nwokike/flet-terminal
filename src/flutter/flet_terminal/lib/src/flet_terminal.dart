@@ -22,7 +22,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   late final qt.Terminal _terminal;
   final qt.TerminalController _terminalController = qt.TerminalController();
   final FocusNode _focusNode = FocusNode();
-  late final DataChannel _channel;
+  DataChannel? _channel;
   StreamSubscription<Uint8List>? _channelSub;
 
   @override
@@ -68,8 +68,8 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
         widget.control.triggerEvent("modifier_reset", "");
       }
 
-      if (_channelSub != null) {
-        _channel.send(Uint8List.fromList(utf8.encode(processed)));
+      if (_channelSub != null && _channel != null) {
+        _channel!.send(Uint8List.fromList(utf8.encode(processed)));
       } else {
         widget.control.triggerEvent("data", processed);
       }
@@ -102,8 +102,9 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     if (_channelSub != null) return; // initialize lazily once per spec
 
     try {
-      _channel = FletBackend.of(context).openDataChannel();
-      _channelSub = _channel.messages.listen((bytes) {
+      final ch = FletBackend.of(context).openDataChannel();
+      _channel = ch;
+      _channelSub = ch.messages.listen((bytes) {
         if (mounted) {
           setState(() {
             _terminal.write(utf8.decode(bytes, allowMalformed: true));
@@ -113,7 +114,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
 
       widget.control.triggerEvent("data_channel_open", {
         "channel_name": "pty",
-        "channel_id": _channel.id,
+        "channel_id": ch.id,
       });
     } catch (e) {
       debugPrint("[FletTerminal] Failed to initialize DataChannel in didChangeDependencies: $e");
@@ -271,7 +272,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   void dispose() {
     widget.control.removeInvokeMethodListener(_handleMethodCall);
     _channelSub?.cancel();
-    _channel.close();
+    _channel?.close();
     _focusNode.dispose();
     _terminalController.dispose();
     super.dispose();

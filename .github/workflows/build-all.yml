@@ -50,6 +50,8 @@ jobs:
         with:
           name: web-build
           path: examples/flet_terminal_example/build/web/
+          retention-days: 1
+          overwrite: true
 
   # ─── Linux (.tar.gz Bundle & Portable Executable) ──────
   build-linux:
@@ -78,6 +80,8 @@ jobs:
         with:
           name: linux-build
           path: build/dist/
+          retention-days: 1
+          overwrite: true
 
   # ─── Windows Portable Executable ───────────────────────
   build-windows:
@@ -102,6 +106,8 @@ jobs:
         with:
           name: windows-build
           path: examples/flet_terminal_example/build/windows/
+          retention-days: 1
+          overwrite: true
 
   # ─── Android APK (split per ABI) ───────────────────────
   build-apk:
@@ -131,6 +137,8 @@ jobs:
         with:
           name: android-apk-split
           path: examples/flet_terminal_example/build/apk/
+          retention-days: 1
+          overwrite: true
 
   # ─── Create GitHub Release & Upload Assets ─────────────
   create-release:
