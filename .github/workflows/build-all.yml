@@ -26,8 +26,42 @@ env:
   BUILD_NUMBER: ${{ inputs.build_number || '1' }}
 
 jobs:
-  # ─── Web (PWA Studio Demo) ──────────────────────────────
+  # ─── 0. Create Release Tag & Placeholder ───────────────
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      TAG_NAME: ${{ steps.tag_info.outputs.TAG_NAME }}
+      RELEASE_NAME: ${{ steps.tag_info.outputs.RELEASE_NAME }}
+      IS_PRERELEASE: ${{ steps.tag_info.outputs.IS_PRERELEASE }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Release Tag & Name
+        id: tag_info
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=FletTerminal Studio ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
+          else
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            echo "TAG_NAME=build-${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=Automated Build (${SHORT_SHA})" >> $GITHUB_OUTPUT
+            echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
+          fi
+      - name: Create GitHub Release Placeholder
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_info.outputs.TAG_NAME }}
+          name: ${{ steps.tag_info.outputs.RELEASE_NAME }}
+          prerelease: ${{ steps.tag_info.outputs.IS_PRERELEASE }}
+          make_latest: true
+          body: "Automated multi-platform build generated from commit `${{ github.sha }}`."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─── 1. Web (PWA Studio Demo) ───────────────────────────
   build-web:
+    needs: [prepare-release]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,15 +80,21 @@ jobs:
         run: |
           cd examples/flet_terminal_example
           uv run flet build web --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
-      - uses: actions/upload-artifact@v4
+      - name: Package Web PWA Zip
+        run: |
+          mkdir -p build/dist
+          (cd examples/flet_terminal_example/build/web && zip -r ../../../../build/dist/FletTerminalStudio_${{ env.BUILD_VERSION }}_web_pwa.zip .)
+      - name: Upload directly to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: web-build
-          path: examples/flet_terminal_example/build/web/
-          retention-days: 1
-          overwrite: true
+          tag_name: ${{ needs.prepare-release.outputs.TAG_NAME }}
+          files: build/dist/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ─── Linux (.tar.gz Bundle & Portable Executable) ──────
+  # ─── 2. Linux (.tar.gz Bundle & Portable Executable) ───
   build-linux:
+    needs: [prepare-release]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -76,15 +116,17 @@ jobs:
         run: |
           mkdir -p build/dist
           tar -czf build/dist/FletTerminalStudio_${{ env.BUILD_VERSION }}_linux_x86_64.tar.gz -C examples/flet_terminal_example/build/linux .
-      - uses: actions/upload-artifact@v4
+      - name: Upload directly to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: linux-build
-          path: build/dist/
-          retention-days: 1
-          overwrite: true
+          tag_name: ${{ needs.prepare-release.outputs.TAG_NAME }}
+          files: build/dist/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ─── Windows Portable Executable ───────────────────────
+  # ─── 3. Windows Portable Executable ────────────────────
   build-windows:
+    needs: [prepare-release]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -102,15 +144,22 @@ jobs:
         run: |
           cd examples/flet_terminal_example
           uv run flet build windows --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
-      - uses: actions/upload-artifact@v4
+      - name: Package Windows Executable Zip
+        shell: bash
+        run: |
+          mkdir -p build/dist
+          (cd examples/flet_terminal_example/build/windows && zip -r ../../../../build/dist/FletTerminalStudio_${{ env.BUILD_VERSION }}_windows_x64.zip .)
+      - name: Upload directly to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: windows-build
-          path: examples/flet_terminal_example/build/windows/
-          retention-days: 1
-          overwrite: true
+          tag_name: ${{ needs.prepare-release.outputs.TAG_NAME }}
+          files: build/dist/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ─── Android APK (split per ABI) ───────────────────────
+  # ─── 4. Android APK (split per ABI) ────────────────────
   build-apk:
+    needs: [prepare-release]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -133,67 +182,10 @@ jobs:
         run: |
           cd examples/flet_terminal_example
           uv run flet build apk --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} --split-per-abi -v
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-apk-split
-          path: examples/flet_terminal_example/build/apk/
-          retention-days: 1
-          overwrite: true
-
-  # ─── Create GitHub Release & Upload Assets ─────────────
-  create-release:
-    needs: [build-web, build-linux, build-windows, build-apk]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: all-artifacts
-
-      - name: Package archives for release
-        run: |
-          mkdir -p release_assets
-          # 1. Linux tar.gz
-          cp all-artifacts/linux-build/*.tar.gz release_assets/ || true
-
-          # 2. Windows ZIP
-          if [ -d "all-artifacts/windows-build" ]; then
-            (cd all-artifacts/windows-build && zip -r ../../release_assets/FletTerminalStudio_${{ env.BUILD_VERSION }}_windows_x64.zip .)
-          fi
-
-          # 3. Web PWA ZIP
-          if [ -d "all-artifacts/web-build" ]; then
-            (cd all-artifacts/web-build && zip -r ../../release_assets/FletTerminalStudio_${{ env.BUILD_VERSION }}_web_pwa.zip .)
-          fi
-
-          # 4. Android APKs
-          if [ -d "all-artifacts/android-apk-split" ]; then
-            cp all-artifacts/android-apk-split/*.apk release_assets/ || true
-          fi
-
-          ls -lah release_assets/
-
-      - name: Generate Release Tag & Name
-        id: tag_info
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "RELEASE_NAME=FletTerminal Studio ${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
-          else
-            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-            echo "TAG_NAME=build-${SHORT_SHA}" >> $GITHUB_OUTPUT
-            echo "RELEASE_NAME=Automated Build (${SHORT_SHA})" >> $GITHUB_OUTPUT
-            echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Publish GitHub Release
+      - name: Upload directly to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag_info.outputs.TAG_NAME }}
-          name: ${{ steps.tag_info.outputs.RELEASE_NAME }}
-          prerelease: ${{ steps.tag_info.outputs.IS_PRERELEASE }}
-          make_latest: true
-          files: release_assets/*
+          tag_name: ${{ needs.prepare-release.outputs.TAG_NAME }}
+          files: examples/flet_terminal_example/build/apk/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
