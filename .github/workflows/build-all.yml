@@ -1,6 +1,9 @@
-name: Build Multi-Platform Studio
+name: Build Multi-Platform & Create Release
 
 on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       build_version:
@@ -11,9 +14,9 @@ on:
         description: "Build number"
         required: true
         default: "1"
-  push:
-    tags:
-      - 'v*'
+
+permissions:
+  contents: write
 
 env:
   PYTHONUTF8: "1"
@@ -36,7 +39,7 @@ jobs:
         run: |
           cd examples/flet_terminal_example
           uv run flet build web --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
-      - uses: actions/upload-artifact@v5.0.0
+      - uses: actions/upload-artifact@v4
         with:
           name: web-build
           path: examples/flet_terminal_example/build/web/
@@ -57,7 +60,7 @@ jobs:
         run: |
           mkdir -p build/dist
           tar -czf build/dist/FletTerminalStudio_${{ env.BUILD_VERSION }}_linux_x86_64.tar.gz -C examples/flet_terminal_example/build/linux .
-      - uses: actions/upload-artifact@v5.0.0
+      - uses: actions/upload-artifact@v4
         with:
           name: linux-build
           path: build/dist/
@@ -72,7 +75,7 @@ jobs:
         run: |
           cd examples/flet_terminal_example
           uv run flet build windows --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
-      - uses: actions/upload-artifact@v5.0.0
+      - uses: actions/upload-artifact@v4
         with:
           name: windows-build
           path: examples/flet_terminal_example/build/windows/
@@ -90,11 +93,76 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - name: Pre-compile binary wheels
+        run: |
+          mkdir -p wheels
+          pip install wheel build
+          python -m build --wheel --outdir wheels/ .
       - name: Build Android APK (split per ABI)
+        env:
+          PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
           cd examples/flet_terminal_example
           uv run flet build apk --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} --split-per-abi -v
-      - uses: actions/upload-artifact@v5.0.0
+      - uses: actions/upload-artifact@v4
         with:
           name: android-apk-split
           path: examples/flet_terminal_example/build/apk/
+
+  # ─── Create GitHub Release & Upload Assets ─────────────
+  create-release:
+    needs: [build-web, build-linux, build-windows, build-apk]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+
+      - name: Package archives for release
+        run: |
+          mkdir -p release_assets
+          # 1. Linux tar.gz
+          cp all-artifacts/linux-build/*.tar.gz release_assets/ || true
+
+          # 2. Windows ZIP
+          if [ -d "all-artifacts/windows-build" ]; then
+            (cd all-artifacts/windows-build && zip -r ../../release_assets/FletTerminalStudio_${{ env.BUILD_VERSION }}_windows_x64.zip .)
+          fi
+
+          # 3. Web PWA ZIP
+          if [ -d "all-artifacts/web-build" ]; then
+            (cd all-artifacts/web-build && zip -r ../../release_assets/FletTerminalStudio_${{ env.BUILD_VERSION }}_web_pwa.zip .)
+          fi
+
+          # 4. Android APKs
+          if [ -d "all-artifacts/android-apk-split" ]; then
+            cp all-artifacts/android-apk-split/*.apk release_assets/ || true
+          fi
+
+          ls -lah release_assets/
+
+      - name: Generate Release Tag & Name
+        id: tag_info
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=FletTerminal Studio ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
+          else
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            echo "TAG_NAME=build-${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=Automated Build (${SHORT_SHA})" >> $GITHUB_OUTPUT
+            echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_info.outputs.TAG_NAME }}
+          name: ${{ steps.tag_info.outputs.RELEASE_NAME }}
+          prerelease: ${{ steps.tag_info.outputs.IS_PRERELEASE }}
+          make_latest: true
+          files: release_assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
