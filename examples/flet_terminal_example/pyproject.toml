@@ -9,5 +9,13 @@ dependencies = [
     "flet>=0.86.0",
 ]
 
+[tool.flet]
+org = "ng.kiri"
+product = "FletTerminal Studio"
+build_number = 1
+
+[tool.flet.app]
+path = "src"
+
 [tool.uv]
 dev-dependencies = []
