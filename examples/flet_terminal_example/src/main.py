@@ -109,13 +109,12 @@ def main(page: ft.Page):
         auto_focus=True,
     )
 
-    active_engine = "ANSI Demo Engine"
+    default_engine = "Local OS PTY" if (HAS_POSIX_PTY or HAS_WIN_PTY) else "ANSI Demo Engine"
+    active_engine = default_engine
     pty_master_fd = None
     pty_process = None
 
     # Status Bar indicators
-    engine_status_text = ft.Text("⚡ Active Engine: ANSI VT100 Demo Engine", size=12, weight=ft.FontWeight.BOLD, color="#A6E3A1")
-    os_status_text = ft.Text(f"🖥️ Target OS: {sys.platform.upper()} | HAS_POSIX_PTY: {HAS_POSIX_PTY} | HAS_WIN_PTY: {HAS_WIN_PTY}", size=11, color="#7F849C")
     title_status_text = ft.Text("📌 Title: FletTerminal", size=11, color="#89B4FA")
 
     # Event handlers from terminal
@@ -206,7 +205,6 @@ def main(page: ft.Page):
         except (OSError, AttributeError, Exception) as ex:
             page.show_dialog(ft.SnackBar(ft.Text(f"⚠️ Local PTY failed to start: {ex}. Reverting to Demo Engine."), bgcolor="#F38BA8"))
             active_engine = "ANSI Demo Engine"
-            engine_status_text.value = "⚡ Active Engine: ANSI VT100 Demo Engine"
             stop_pty()
             terminal.clear()
             terminal.write(f"\r\n\x1b[1;31m[PTY Error]\x1b[0m Local OS PTY is not available in this environment ({ex}).\r\nSwitched to ANSI VT100 Demo Engine.\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
@@ -232,7 +230,6 @@ def main(page: ft.Page):
             except Exception as ex:
                 page.show_dialog(ft.SnackBar(ft.Text(f"⚠️ WinPTY failed to start: {ex}. Reverting to Demo Engine."), bgcolor="#F38BA8"))
                 active_engine = "ANSI Demo Engine"
-                engine_status_text.value = "⚡ Active Engine: ANSI VT100 Demo Engine"
                 stop_pty()
                 terminal.clear()
                 terminal.write(f"\r\n\x1b[1;31m[PTY Error]\x1b[0m WinPTY is not available ({ex}).\r\nSwitched to ANSI VT100 Demo Engine.\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
@@ -264,7 +261,6 @@ def main(page: ft.Page):
                 page.update()
                 return
             active_engine = "Local OS PTY"
-            engine_status_text.value = f"⚡ Active Engine: Local OS PTY ({'POSIX shell' if HAS_POSIX_PTY else 'WinPTY PowerShell'})"
             terminal.clear()
             stop_pty()
             if HAS_POSIX_PTY:
@@ -273,7 +269,6 @@ def main(page: ft.Page):
                 start_win_pty()
         else:
             active_engine = "ANSI Demo Engine"
-            engine_status_text.value = "⚡ Active Engine: ANSI VT100 Demo Engine"
             stop_pty()
             terminal.clear()
             terminal.write("\x1b[1;36m=== FletTerminal VT100/ANSI Demo Engine Active ===\x1b[0m\r\nType commands or use test buttons above.\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
@@ -357,112 +352,130 @@ def main(page: ft.Page):
         if search_field.value:
             terminal.search(search_field.value)
 
-    page.add(
-        ft.Container(
-            content=ft.Column(
-                controls=[
-                    # Header bar
-                    ft.Container(
-                        content=ft.Row(
-                            controls=[
-                                ft.Text("🚀 FletTerminal Studio", size=16, weight=ft.FontWeight.BOLD, color="#CDD6F4"),
-                                ft.Container(width=16),
-                                engine_status_text,
-                                ft.Container(expand=True),
-                                os_status_text,
-                            ]
-                        ),
-                        padding=ft.Padding(16, 12, 16, 12),
-                        bgcolor="#181825",
-                        border=ft.Border.only(bottom=ft.BorderSide(1, "#313244")),
-                    ),
-                    # Toolbar / Engine & Tests selector
-                    ft.Container(
-                        content=ft.Row(
-                            controls=[
-                                ft.Text("Engine:", size=12, color="#BAC2DE"),
-                                ft.Dropdown(
-                                    options=[
-                                        ft.dropdown.Option("ANSI Demo Engine"),
-                                        ft.dropdown.Option("Local OS PTY"),
-                                    ],
-                                    value="ANSI Demo Engine",
-                                    height=34,
-                                    width=160,
-                                    text_size=12,
-                                    on_select=switch_engine,
-                                ),
-                                ft.Container(width=12),
-                                ft.Text("Benchmarks:", size=12, color="#BAC2DE"),
-                                ft.Button("🎨 Color Matrix", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=run_ansi_matrix),
-                                ft.Button("🚀 10k Line Stress", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=run_stress_test),
-                                ft.Button("🖥️ Alt Screen (htop)", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=run_alternate_screen_test),
-                                ft.Button("🔔 Bell & Title", height=32, style=ft.ButtonStyle(padding=ft.Padding(10, 4, 10, 4)), on_click=trigger_osc_bell),
-                            ],
-                            wrap=True,
-                        ),
-                        padding=ft.Padding(16, 8, 16, 8),
-                        bgcolor="#1E1E2E",
-                    ),
-                    # Customization & Search bar
-                    ft.Container(
-                        content=ft.Row(
-                            controls=[
-                                ft.Text("Theme:", size=12, color="#BAC2DE"),
-                                ft.Dropdown(
-                                    options=[ft.dropdown.Option(k) for k in themes.keys()],
-                                    value=active_theme_name,
-                                    height=34,
-                                    width=140,
-                                    text_size=12,
-                                    on_select=change_theme,
-                                ),
-                                ft.Container(width=12),
-                                ft.Text("Cursor:", size=12, color="#BAC2DE"),
-                                ft.Dropdown(
-                                    options=[
-                                        ft.dropdown.Option("Block"),
-                                        ft.dropdown.Option("Underline"),
-                                        ft.dropdown.Option("Bar"),
-                                    ],
-                                    value="Block",
-                                    height=34,
-                                    width=110,
-                                    text_size=12,
-                                    on_select=change_cursor_style,
-                                ),
-                                ft.Checkbox(label="Blink", value=True, on_change=toggle_cursor_blink),
-                                ft.Container(width=12),
-                                ft.IconButton(ft.Icons.ZOOM_OUT, icon_size=18, tooltip="Zoom Out", on_click=zoom_out),
-                                ft.IconButton(ft.Icons.ZOOM_IN, icon_size=18, tooltip="Zoom In", on_click=zoom_in),
-                                ft.Container(width=12),
-                                search_field,
-                                ft.IconButton(ft.Icons.SEARCH, icon_size=18, tooltip="Search", on_click=do_search),
-                                ft.Container(width=12),
-                                title_status_text,
-                            ]
-                        ),
-                        padding=ft.Padding(16, 8, 16, 8),
-                        bgcolor="#181825",
-                        border=ft.Border.only(bottom=ft.BorderSide(1, "#313244")),
-                    ),
-                    # Main Terminal Canvas
-                    terminal,
+    toolbar_controls = []
+    if HAS_POSIX_PTY or HAS_WIN_PTY:
+        toolbar_controls.extend([
+            ft.Text("Engine:", size=11, color="#BAC2DE"),
+            ft.Dropdown(
+                options=[
+                    ft.dropdown.Option("ANSI Demo Engine"),
+                    ft.dropdown.Option("Local OS PTY"),
                 ],
-                spacing=0,
+                value=active_engine,
+                height=26,
+                width=135,
+                text_size=11,
+                content_padding=ft.Padding(8, 0, 8, 0),
+                on_select=switch_engine,
+            ),
+            ft.Container(width=2),
+        ])
+    else:
+        toolbar_controls.extend([
+            ft.Container(
+                content=ft.Row(
+                    [ft.Icon(ft.Icons.TERMINAL, size=14, color="#A6E3A1"), ft.Text("VT100 Demo", size=11, weight=ft.FontWeight.BOLD, color="#A6E3A1")],
+                    spacing=4,
+                ),
+                padding=ft.Padding(6, 2, 6, 2),
+                bgcolor="#313244",
+                border_radius=4,
+            ),
+            ft.Container(width=2),
+        ])
+
+    toolbar_controls.extend([
+        ft.Text("Theme:", size=11, color="#BAC2DE"),
+        ft.Dropdown(
+            options=[ft.dropdown.Option(k) for k in themes.keys()],
+            value=active_theme_name,
+            height=26,
+            width=115,
+            text_size=11,
+            content_padding=ft.Padding(8, 0, 8, 0),
+            on_select=change_theme,
+        ),
+        ft.Container(width=2),
+        ft.Text("Cursor:", size=11, color="#BAC2DE"),
+        ft.Dropdown(
+            options=[
+                ft.dropdown.Option("Block"),
+                ft.dropdown.Option("Underline"),
+                ft.dropdown.Option("Bar"),
+            ],
+            value="Block",
+            height=26,
+            width=90,
+            text_size=11,
+            content_padding=ft.Padding(8, 0, 8, 0),
+            on_select=change_cursor_style,
+        ),
+        ft.Checkbox(label="Blink", value=True, on_change=toggle_cursor_blink, scale=0.75),
+        ft.Container(width=2),
+        ft.IconButton(ft.Icons.ZOOM_OUT, icon_size=16, tooltip="Zoom Out", on_click=zoom_out),
+        ft.IconButton(ft.Icons.ZOOM_IN, icon_size=16, tooltip="Zoom In", on_click=zoom_in),
+        ft.Container(width=2),
+        search_field,
+        ft.IconButton(ft.Icons.SEARCH, icon_size=16, tooltip="Search", on_click=do_search),
+        ft.Container(width=2),
+        ft.PopupMenuButton(
+            tooltip="Run Demos & Benchmarks",
+            content=ft.Container(
+                content=ft.Row(
+                    [ft.Icon(ft.Icons.AUTO_AWESOME, size=14, color="#F9E2AF"), ft.Text("Demos", size=11, color="#F9E2AF")],
+                    spacing=4,
+                ),
+                padding=ft.Padding(6, 4, 6, 4),
+                bgcolor="#313244",
+                border_radius=4,
+            ),
+            items=[
+                ft.PopupMenuItem(content=ft.Text("🎨 Color Matrix", size=11), on_click=run_ansi_matrix),
+                ft.PopupMenuItem(content=ft.Text("🚀 10k Line Stress", size=11), on_click=run_stress_test),
+                ft.PopupMenuItem(content=ft.Text("🖥️ Alt Screen (htop)", size=11), on_click=run_alternate_screen_test),
+                ft.PopupMenuItem(content=ft.Text("🔔 Bell & Title", size=11), on_click=trigger_osc_bell),
+            ],
+        ),
+        ft.Container(width=4),
+        title_status_text,
+    ])
+
+    toolbar = ft.Container(
+        content=ft.Row(
+            controls=toolbar_controls,
+            scroll=ft.ScrollMode.ADAPTIVE,
+            spacing=6,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        ),
+        padding=ft.Padding(8, 4, 8, 4),
+        bgcolor="#181825",
+        border=ft.Border.only(bottom=ft.BorderSide(1, "#313244")),
+    )
+
+    page.add(
+        ft.SafeArea(
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[
+                        toolbar,
+                        terminal,
+                    ],
+                    spacing=0,
+                    expand=True,
+                ),
                 expand=True,
             ),
             expand=True,
         )
     )
 
-    # Initial greeting in terminal right after control is added to page
-    terminal.write("\x1b[1;36m========================================================================\x1b[0m\r\n")
-    terminal.write("\x1b[1;32m  FletTerminal v0.1.0 Studio — Native GPU-Accelerated Terminal Control  \x1b[0m\r\n")
-    terminal.write("\x1b[1;36m========================================================================\x1b[0m\r\n")
-    terminal.write(f"Target OS: \x1b[33m{sys.platform.upper()}\x1b[0m | POSIX PTY: \x1b[33m{HAS_POSIX_PTY}\x1b[0m | Windows ConPTY: \x1b[33m{HAS_WIN_PTY}\x1b[0m\r\n")
-    terminal.write("Use the controls above to test themes, high-throughput streaming, and local PTYs.\r\n")
-    terminal.write("\x1b[32m[Demo Shell]>\x1b[0m ")
+    if active_engine == "Local OS PTY":
+        if HAS_POSIX_PTY:
+            start_posix_pty()
+        elif HAS_WIN_PTY:
+            start_win_pty()
+    else:
+        terminal.write("\x1b[32m[Demo Shell]>\x1b[0m ")
 
 
 if __name__ == "__main__":
