@@ -61,29 +61,53 @@ class ExtraKeysBar(ft.Container):
 
         self._toggle_btn = ft.IconButton(
             icon=ft.Icons.ARROW_DROP_DOWN,
-            icon_size=16,
-            tooltip="Collapse virtual keys",
+            icon_size=20,
+            tooltip="Hide keys",
             style=ft.ButtonStyle(padding=2, visual_density=ft.VisualDensity.COMPACT),
             on_click=self._on_toggle_collapse,
         )
 
-        controls: list[ft.Control] = [self._toggle_btn]
+        key_controls: list[ft.Control] = []
         if show_settings:
-            controls.append(self._build_settings_menu())
+            key_controls.append(self._build_settings_menu())
 
         for label, payload in self._keys:
-            controls.append(self._make_key_btn(label, payload))
+            key_controls.append(self._make_key_btn(label, payload))
 
         self._keys_row = ft.Row(
-            controls=controls,
+            controls=key_controls,
             spacing=SPACE_XS,
             scroll=ft.ScrollMode.AUTO,
+            expand=True,
+        )
+
+        self._expanded_row = ft.Row(
+            controls=[
+                self._toggle_btn,
+                self._keys_row,
+            ],
+            spacing=2,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
+        self._collapsed_view = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Container(expand=True),
+                    self._toggle_btn,
+                    ft.Container(expand=True),
+                ],
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            on_click=self._on_toggle_collapse,
+            ink=True,
+            tooltip="Click anywhere to show keys",
         )
 
         super().__init__(
-            content=self._keys_row,
-            padding=ft.Padding(4, 2, 4, 2),
-            bgcolor="#1A1B26",
+            content=self._expanded_row,
+            padding=ft.Padding(4, 1, 4, 1),
+            bgcolor="#181825",
         )
 
     def _build_settings_menu(self) -> ft.PopupMenuButton:
@@ -160,7 +184,9 @@ class ExtraKeysBar(ft.Container):
             btn = ft.Button(
                 content=ft.Text(label, size=BTN_FONT_SIZE, weight=ft.FontWeight.BOLD),
                 height=BTN_HEIGHT,
-                style=self._get_modifier_style(False),
+                style=self._get_modifier_style(
+                    self.ctrl_active if is_ctrl else self.alt_active
+                ),
                 on_click=lambda e, c=is_ctrl: self._toggle_modifier(c),
             )
             if is_ctrl:
@@ -206,10 +232,12 @@ class ExtraKeysBar(ft.Container):
     def refresh_buttons(self):
         if self._btn_ctrl:
             self._btn_ctrl.style = self._get_modifier_style(self.ctrl_active)
-            self._btn_ctrl.update()
+            if self._btn_ctrl.page:
+                self._btn_ctrl.update()
         if self._btn_alt:
             self._btn_alt.style = self._get_modifier_style(self.alt_active)
-            self._btn_alt.update()
+            if self._btn_alt.page:
+                self._btn_alt.update()
 
     def reset_modifiers(self):
         if self.ctrl_active or self.alt_active:
@@ -238,17 +266,11 @@ class ExtraKeysBar(ft.Container):
     def _on_toggle_collapse(self, e):
         self._collapsed = not self._collapsed
         if self._collapsed:
-            self._keys_row.controls = [self._toggle_btn]
-            self._toggle_btn.icon = ft.Icons.KEYBOARD
-            self._toggle_btn.tooltip = "Show virtual keys"
+            self._toggle_btn.icon = ft.Icons.ARROW_DROP_UP
+            self._toggle_btn.tooltip = "Show keys"
+            self.content = self._collapsed_view
         else:
-            controls: list[ft.Control] = [self._toggle_btn]
-            if self._on_set_theme is not None:
-                controls.append(self._build_settings_menu())
-            for label, payload in self._keys:
-                controls.append(self._make_key_btn(label, payload))
-            self._keys_row.controls = controls
             self._toggle_btn.icon = ft.Icons.ARROW_DROP_DOWN
-            self._toggle_btn.tooltip = "Collapse virtual keys"
-            self.refresh_buttons()
+            self._toggle_btn.tooltip = "Hide keys"
+            self.content = self._expanded_row
         self.update()

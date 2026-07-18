@@ -42,9 +42,9 @@ def build_demo_appbar(
 
     # Demos popup
     demos_popup = ft.PopupMenuButton(
-        icon=ft.Icons.AUTO_FIX_HIGH,
-        icon_size=18,
-        tooltip="Run Demo Benchmarks",
+        icon=ft.Icons.VIEW_LIST,
+        icon_size=20,
+        tooltip="Demos",
         style=ft.ButtonStyle(padding=4, visual_density=ft.VisualDensity.COMPACT),
         items=[
             ft.PopupMenuItem(
@@ -93,10 +93,13 @@ def _change_font_size(page: ft.Page, mt: Any, delta: float):
     new_size = max(8.0, min(36.0, (mt._terminal.font_size or 13.0) + delta))
     mt._terminal.font_size = new_size
     mt._terminal.update()
-    page.show_dialog(
-        ft.SnackBar(
-            ft.Text(f"Font Size: {int(new_size)}px"),
-            bgcolor="#313244",
-            duration=1000,
-        )
+
+    page.overlay = [c for c in page.overlay if not isinstance(c, ft.SnackBar)]
+    sb = ft.SnackBar(
+        content=ft.Text(f"Font Size: {int(new_size)}px"),
+        bgcolor="#313244",
+        duration=1000,
+        open=True,
     )
+    page.overlay.append(sb)
+    page.update()
