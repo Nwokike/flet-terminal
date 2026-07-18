@@ -4,10 +4,19 @@ Native GPU-accelerated Terminal control for Flet (`ft.LayoutControl`) powered by
 
 ---
 
-## 🚀 Test the Demo Studio App right now
+## 🚀 Multi-Platform Demo Studio Downloads
+
 Want to try the live terminal demo, high-speed ring buffer stress tests, and Termux virtual accessory keys before integrating?  
-Download the pre-built multi-platform binaries from our latest release:  
-👉 **[Download Latest Release (Android APKs, Windows Portable Zip, Linux Bundle & Web PWA)](https://github.com/Nwokike/flet-terminal/releases/latest)**
+Download the pre-built multi-platform binaries right now:
+
+| Variant | Download Link | Notes |
+| :--- | :---: | :--- |
+| 📱 **ARM64** (most phones) | [**fletterminalstudio-arm64-v8a.apk**](https://github.com/Nwokike/flet-terminal/releases/latest/download/fletterminalstudio-arm64-v8a.apk) | Modern 64-bit Android devices |
+| 📱 **ARMv7** (older phones) | [**fletterminalstudio-armeabi-v7a.apk**](https://github.com/Nwokike/flet-terminal/releases/latest/download/fletterminalstudio-armeabi-v7a.apk) | Legacy 32-bit Android devices |
+| 💻 **x86_64** (emulators) | [**fletterminalstudio-x86_64.apk**](https://github.com/Nwokike/flet-terminal/releases/latest/download/fletterminalstudio-x86_64.apk) | Chromebooks & Android emulators |
+| 🖥️ **Windows portable** | [**FletTerminalStudio_0.1.0_windows_x64.zip**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalStudio_0.1.0_windows_x64.zip) | Standalone portable executable (`.exe`) |
+| 🐧 **Linux standalone** | [**FletTerminalStudio_0.1.0_linux_x86_64.tar.gz**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalStudio_0.1.0_linux_x86_64.tar.gz) | Pre-compiled Linux binary bundle |
+| 🌐 **Web PWA** | [**FletTerminalStudio_0.1.0_web_pwa.zip**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalStudio_0.1.0_web_pwa.zip) | Static Web Assembly / Progressive Web App |
 
 ---
 
@@ -77,4 +86,4 @@ ft.run(main)
 ---
 
 ## 📄 License
-MIT License
+[MIT License](LICENSE)
