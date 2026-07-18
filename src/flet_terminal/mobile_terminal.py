@@ -105,7 +105,6 @@ class MobileTerminal(ft.Column):
         *,
         show_extra_keys: bool = True,
         show_search: bool = True,
-        show_settings: bool = True,
         extra_keys_visible: bool = True,
         extra_keys: list[tuple[str, bytes | None]] | None = None,
         theme_name: str | None = None,
@@ -121,13 +120,11 @@ class MobileTerminal(ft.Column):
         self._extra_keys = list(extra_keys or DEFAULT_EXTRA_KEYS)
         self._keys_visible = extra_keys_visible
         self._keys_enabled = show_extra_keys
-        self._settings_enabled = show_settings
         self._ctrl_active: bool = False
         self._alt_active: bool = False
-        self._theme_name: str | None = theme_name
-        self._search_query: str = ""
-        self._search_idx: int = -1
-        self._match_offset: int = -1
+
+        # Sync internal modifier state when the terminal resets modifiers
+        self._terminal.on_modifier_reset = lambda e: self._on_terminal_modifier_reset()
 
         self._search_bar = self._build_search_bar() if show_search else None
         self._keys_bar, self._keys_collapsed = self._build_keys_bars()
@@ -150,47 +147,47 @@ class MobileTerminal(ft.Column):
     def _build_search_bar(self) -> ft.Container:
         self._search_field = ft.TextField(
             hint_text="Search…",
-            height=34,
-            width=150,
-            text_size=12,
-            content_padding=ft.Padding.symmetric(horizontal=10, vertical=2),
+            height=28,
+            text_size=11,
+            expand=True,
+            content_padding=ft.Padding.symmetric(horizontal=8, vertical=0),
             bgcolor="#1E1E2E",
             border_color="#45475A",
             on_submit=lambda e: self._do_search_next(),
         )
         search_btn = ft.IconButton(
             icon=ft.Icons.SEARCH,
-            icon_size=16,
+            icon_size=14,
             tooltip="Search",
-            style=ft.ButtonStyle(padding=4, visual_density=ft.VisualDensity.COMPACT),
+            style=ft.ButtonStyle(padding=2, visual_density=ft.VisualDensity.COMPACT),
             on_click=lambda e: self._do_search(),
         )
         return ft.Container(
-            content=ft.Row(controls=[self._search_field, search_btn], spacing=4),
-            padding=ft.Padding(6, 4, 6, 4),
-            bgcolor="#181825",
-            border=ft.Border.only(bottom=ft.BorderSide(1, "#313244")),
+            content=ft.Row(
+                controls=[self._search_field, search_btn],
+                spacing=2,
+            ),
+            padding=ft.Padding(2, 1, 2, 1),
         )
+
+    def _on_terminal_modifier_reset(self):
+        """Called when the Dart side auto-resets modifiers after a keystroke."""
+        if self._ctrl_active or self._alt_active:
+            self._ctrl_active = False
+            self._alt_active = False
+            self._refresh_modifier_buttons()
 
     def _do_search(self):
         q = self._search_field.value or ""
-        if not q:
-            return
-        self._search_query = q
-        self._search_idx = 0
-        self._terminal.search(q, start=0)
+        if q:
+            self._terminal.search(q, start=0)
 
     def _do_search_next(self):
         q = self._search_field.value or ""
-        if not q:
-            return
-        if q != self._search_query:
-            self._search_query = q
-            self._search_idx = 0
+        if q:
+            # Step through matches by always searching from start=0;
+            # the Dart side wraps to the first match when it hits the end.
             self._terminal.search(q, start=0)
-            return
-        self._search_idx += 1
-        self._terminal.search(q, start=self._match_offset + 1)
 
     # ── Extra-keys bar ────────────────────────────────────────────────
 
@@ -199,33 +196,24 @@ class MobileTerminal(ft.Column):
     ) -> ft.Control:
         if payload is None:
             is_ctrl = label == "CTRL"
-            return ft.Button(
+            btn = ft.Button(
                 label,
                 height=28,
                 style=ft.ButtonStyle(
                     padding=ft.Padding.symmetric(horizontal=4, vertical=0),
-                    bgcolor="#8BE9FD"
-                    if (
-                        is_ctrl
-                        and self._ctrl_active
-                        or not is_ctrl
-                        and self._alt_active
-                    )
-                    else bg,
-                    color="#1E1E1E"
-                    if (
-                        is_ctrl
-                        and self._ctrl_active
-                        or not is_ctrl
-                        and self._alt_active
-                    )
-                    else "#CDD6F4",
+                    bgcolor=bg,
+                    color="#CDD6F4",
                     text_style=ft.TextStyle(size=11, weight=ft.FontWeight.BOLD),
                     visual_density=ft.VisualDensity.COMPACT,
                     side=ft.BorderSide(width=0),
                 ),
                 on_click=lambda e, c=is_ctrl: self._toggle_modifier(c),
             )
+            if is_ctrl:
+                self._btn_ctrl = btn
+            else:
+                self._btn_alt = btn
+            return btn
         return ft.Button(
             content=ft.Text(label, size=11, weight=ft.FontWeight.BOLD, color="#CDD6F4"),
             height=28,
@@ -251,7 +239,6 @@ class MobileTerminal(ft.Column):
             payload = b"\x1b" + payload
             self._alt_active = False
             self._refresh_modifier_buttons()
-        # Send via the public API — buffers if channel isn't ready yet.
         self._terminal.send_bytes(payload)
 
     def _toggle_modifier(self, is_ctrl: bool):
@@ -262,25 +249,32 @@ class MobileTerminal(ft.Column):
         self._refresh_modifier_buttons()
 
     def _refresh_modifier_buttons(self):
-        for child in self._keys_row.controls:
-            if isinstance(child, ft.Button) and child.content:
-                txt = child.content.value if hasattr(child.content, "value") else ""
-                if txt in ("CTRL", "ALT"):
-                    active = self._ctrl_active if txt == "CTRL" else self._alt_active
-                    child.style = ft.ButtonStyle(
-                        padding=ft.Padding.symmetric(horizontal=8, vertical=1),
-                        bgcolor="#8BE9FD" if active else "#313244",
-                        color="#1E1E1E" if active else "#CDD6F4",
-                        text_style=ft.TextStyle(size=11, weight=ft.FontWeight.BOLD),
-                        visual_density=ft.VisualDensity.COMPACT,
-                    )
-                    child.update()
+        shared = dict(
+            padding=ft.Padding.symmetric(horizontal=4, vertical=0),
+            text_style=ft.TextStyle(size=11, weight=ft.FontWeight.BOLD),
+            visual_density=ft.VisualDensity.COMPACT,
+            side=ft.BorderSide(width=0),
+        )
+        self._btn_ctrl.style = ft.ButtonStyle(
+            bgcolor="#8BE9FD" if self._ctrl_active else "#313244",
+            color="#1E1E1E" if self._ctrl_active else "#CDD6F4",
+            **shared,
+        )
+        self._btn_alt.style = ft.ButtonStyle(
+            bgcolor="#8BE9FD" if self._alt_active else "#313244",
+            color="#1E1E1E" if self._alt_active else "#CDD6F4",
+            **shared,
+        )
+        self._btn_ctrl.update()
+        self._btn_alt.update()
         self._terminal.ctrl_active = self._ctrl_active
         self._terminal.alt_active = self._alt_active
         if self.page:
             self.page.update()
 
     def _build_keys_bars(self) -> tuple[ft.Container, ft.Container]:
+        self._btn_ctrl = None
+        self._btn_alt = None
         key_controls: list[ft.Control] = [
             ft.IconButton(
                 icon=ft.Icons.ARROW_DROP_DOWN,
@@ -353,77 +347,6 @@ class MobileTerminal(ft.Column):
             self.page.update()
 
     # ── Settings popup ───────────────────────────────────────────────
-
-    def _build_settings_button(self) -> ft.PopupMenuButton:
-        self._settings_items = self._build_settings_items()
-        return ft.PopupMenuButton(
-            icon=ft.Icons.SETTINGS,
-            icon_size=18,
-            tooltip="Settings",
-            style=ft.ButtonStyle(padding=2, visual_density=ft.VisualDensity.COMPACT),
-            items=self._settings_items,
-        )
-
-    def _build_settings_items(self) -> list[ft.PopupMenuItem]:
-        return [
-            ft.PopupMenuItem(content=ft.Text("Theme"), disabled=True),
-            ft.PopupMenuItem(
-                content=ft.Text("Dracula"),
-                on_click=lambda e: self._set_theme("Dracula"),
-            ),
-            ft.PopupMenuItem(
-                content=ft.Text("JetBrains Dark"),
-                on_click=lambda e: self._set_theme("JetBrains Dark"),
-            ),
-            ft.PopupMenuItem(
-                content=ft.Text("Matrix Green"),
-                on_click=lambda e: self._set_theme("Matrix Green"),
-            ),
-            ft.PopupMenuItem(content=ft.Text("")),
-            ft.PopupMenuItem(content=ft.Text("Cursor"), disabled=True),
-            ft.PopupMenuItem(
-                content=ft.Text("Block"), on_click=lambda e: self._set_cursor("block")
-            ),
-            ft.PopupMenuItem(
-                content=ft.Text("Underline"),
-                on_click=lambda e: self._set_cursor("underline"),
-            ),
-            ft.PopupMenuItem(
-                content=ft.Text("Bar"), on_click=lambda e: self._set_cursor("bar")
-            ),
-            ft.PopupMenuItem(content=ft.Text("")),
-            ft.PopupMenuItem(
-                content=ft.Text("Toggle Cursor Blink"),
-                on_click=lambda e: self._toggle_blink(),
-            ),
-        ]
-
-    def _set_theme(self, name: str):
-        self._theme_name = name
-        preset = BUILTIN_THEMES.get(name)
-        if preset:
-            self._terminal.theme = preset
-            self._terminal.update()
-        self._refresh_settings()
-
-    def _set_cursor(self, style: str):
-        self._terminal.cursor_style = style
-        self._terminal.update()
-        self._refresh_settings()
-
-    def _toggle_blink(self):
-        self._terminal.cursor_blink = not self._terminal.cursor_blink
-        self._terminal.update()
-        self._refresh_settings()
-
-    def _refresh_settings(self):
-        for child in self._keys_row.controls:
-            if isinstance(child, ft.PopupMenuButton) and child.tooltip == "Settings":
-                child.items = self._build_settings_items()
-                child.update()
-                break
-        if self.page:
-            self.page.update()
 
     # ── Forwarded Terminal properties ────────────────────────────────
 

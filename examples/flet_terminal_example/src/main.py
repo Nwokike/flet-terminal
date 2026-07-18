@@ -1,4 +1,4 @@
-"""FletTerminal Cross-Platform Test App & Demo Studio.
+"""FletTerminal Cross-Platform Test App & Demo Demo.
 
 Tests FletTerminal across Web, Linux, Windows, and Android with built-in
 VT100/ANSI stress testing engines and local OS PTY integration (`bash` / `PowerShell`).
@@ -49,9 +49,6 @@ except ImportError:
 # Android can use subprocess pipes for a basic shell (no PTY, so no
 # job control or fullscreen apps, but ls/cd/cat/echo/grep all work).
 HAS_ANDROID_SUBPROCESS = sys.platform == "android"
-
-# Width below which the toolbar collapses secondary actions into the overflow menu.
-COMPACT_THRESHOLD = 500
 
 THEMES = {
     "Dracula": {
@@ -120,20 +117,9 @@ def main(page: ft.Page):
     pty_process = None
     android_proc = None
 
-    # Modifier key state (Termux-style toggles)
-    ctrl_active = False
-    alt_active = False
-
-    # Search state — last match offset + pointer for stepping through matches.
-    search_idx = -1
-    search_query = ""
-    _match_offset = -1
-
-    # ─── Terminal ───────────────────────────────────────────────
     mt = MobileTerminal(
         show_extra_keys=True,
-        show_search=False,
-        show_settings=True,
+        show_search=True,
         scrollback=10000,
         font_family="JetBrains Mono",
         font_size=13.0,
@@ -148,7 +134,7 @@ def main(page: ft.Page):
         page.update()
 
     def handle_bell(e):
-        page.show_snack_bar(
+        page.show_dialog(
             ft.SnackBar(
                 ft.Text("🔔 Terminal Bell Triggered! (\\a)"),
                 bgcolor="#F38BA8",
@@ -161,19 +147,17 @@ def main(page: ft.Page):
 
     # ─── Incoming bytes from Dart widget ────────────────────────
     def handle_terminal_bytes(payload: bytes):
-        nonlocal pty_master_fd, pty_process, android_proc, ctrl_active, alt_active
-        if ctrl_active and len(payload) == 1:
+        nonlocal pty_master_fd, pty_process, android_proc
+        if mt.ctrl_active and len(payload) == 1:
             code = payload[0]
-            if 97 <= code <= 122:  # a-z
+            if 97 <= code <= 122:
                 payload = bytes([code - 96])
-            elif 65 <= code <= 90:  # A-Z
+            elif 65 <= code <= 90:
                 payload = bytes([code - 64])
-            ctrl_active = False
-            _update_modifier_buttons()
-        if alt_active:
+            mt.ctrl_active = False
+        if mt.alt_active:
             payload = b"\x1b" + payload
-            alt_active = False
-            _update_modifier_buttons()
+            mt.alt_active = False
 
         if active_engine == "Local OS PTY":
             if HAS_POSIX_PTY and pty_master_fd is not None:
@@ -270,7 +254,7 @@ def main(page: ft.Page):
 
                 threading.Thread(target=read_loop, daemon=True).start()
         except (OSError, AttributeError, Exception) as ex:
-            page.show_snack_bar(
+            page.show_dialog(
                 ft.SnackBar(
                     ft.Text(
                         f"⚠️ Local PTY failed to start: {ex}. Reverting to Demo Engine."
@@ -304,7 +288,7 @@ def main(page: ft.Page):
 
                 threading.Thread(target=read_loop, daemon=True).start()
             except Exception as ex:
-                page.show_snack_bar(
+                page.show_dialog(
                     ft.SnackBar(
                         ft.Text(
                             f"⚠️ WinPTY failed to start: {ex}. Reverting to Demo Engine."
@@ -346,7 +330,7 @@ def main(page: ft.Page):
 
             threading.Thread(target=read_loop, daemon=True).start()
         except Exception as ex:
-            page.show_snack_bar(
+            page.show_dialog(
                 ft.SnackBar(
                     ft.Text(
                         f"⚠️ Android shell failed to start: {ex}. Reverting to Demo Engine."
@@ -393,7 +377,7 @@ def main(page: ft.Page):
         selected = e.control.value
         if selected == "Local OS PTY":
             if not HAS_POSIX_PTY and not HAS_WIN_PTY:
-                page.show_snack_bar(
+                page.show_dialog(
                     ft.SnackBar(
                         ft.Text(
                             "⚠️ Local PTY is unavailable on Web/Android sandbox or unconfigured OS."
@@ -512,191 +496,7 @@ def main(page: ft.Page):
             mt.font_size -= 1.0
             mt.update()
 
-    # ─── Functional search (Dart selects the match; Python reports count) ──
-    def handle_selection_change(e):
-        nonlocal _match_offset
-        try:
-            data = json.loads(e.data)
-        except Exception:
-            return
-        query = data.get("query", "")
-        found = data.get("found", False)
-        count = data.get("count", 0)
-        index = data.get("index", -1)
-        if found:
-            _match_offset = index
-        if not found:
-            page.show_snack_bar(
-                ft.SnackBar(
-                    ft.Text(f'🔍 No matches for "{query}"'),
-                    bgcolor="#313244",
-                    duration=1500,
-                )
-            )
-        else:
-            label = search_idx + 1 if (query == search_query and search_idx >= 0) else 1
-            page.show_snack_bar(
-                ft.SnackBar(
-                    ft.Text(f'🔍 {label} of {count} matches for "{query}"'),
-                    bgcolor="#313244",
-                    duration=1500,
-                )
-            )
-
-    mt.on_selection_change = handle_selection_change
-
-    def do_search(e):
-        """Fresh search from the top; selects the first match."""
-        nonlocal search_query, search_idx
-        q = search_field.value or ""
-        if not q:
-            return
-        search_query = q
-        search_idx = 0
-        mt.search(q, start=0)
-
-    def do_search_next(e):
-        """Step to the next match (triggered by Enter in the search field)."""
-        nonlocal search_query, search_idx
-        q = search_field.value or ""
-        if not q:
-            return
-        if q != search_query:
-            search_query = q
-            search_idx = 0
-            mt.search(q, start=0)
-            return
-        search_idx += 1
-        # `start` resumes scanning just past the previous match offset.
-        mt.search(q, start=_last_match_offset() + 1)
-
-    def _last_match_offset() -> int:
-        # The most recent match offset is tracked when the Dart event arrives.
-        return _match_offset
-
-    # ─── Modifier toggle buttons (CTRL / ALT) ───────────────────
-    btn_ctrl = ft.IconButton(
-        icon=ft.Icons.KEYBOARD_CONTROL,
-        icon_size=16,
-        tooltip="CTRL",
-        selected=ctrl_active,
-        selected_icon=ft.Icons.KEYBOARD_CONTROL,
-        style=ft.ButtonStyle(padding=4, visual_density=ft.VisualDensity.COMPACT),
-        on_click=lambda e: _toggle_ctrl(),
-    )
-    btn_alt = ft.IconButton(
-        icon=ft.Icons.ALT_ROUTE,
-        icon_size=16,
-        tooltip="ALT",
-        selected=alt_active,
-        selected_icon=ft.Icons.ALT_ROUTE,
-        style=ft.ButtonStyle(padding=4, visual_density=ft.VisualDensity.COMPACT),
-        on_click=lambda e: _toggle_alt(),
-    )
-
-    def _toggle_ctrl():
-        nonlocal ctrl_active
-        ctrl_active = not ctrl_active
-        btn_ctrl.selected = ctrl_active
-        _update_modifier_buttons()
-
-    def _toggle_alt():
-        nonlocal alt_active
-        alt_active = not alt_active
-        btn_alt.selected = alt_active
-        _update_modifier_buttons()
-
-    def _update_modifier_buttons():
-        btn_ctrl.selected = ctrl_active
-        btn_alt.selected = alt_active
-        page.update()
-
-    # ─── Extra (Termux-style) keys bar ──────────────────────────
-    def send_virtual_key(payload: bytes):
-        handle_terminal_bytes(payload)
-
-    def _make_key_btn(label, payload, bg="#313244"):
-        return ft.Button(
-            content=ft.Text(label, size=12, weight=ft.FontWeight.BOLD, color="#CDD6F4"),
-            height=34,
-            style=ft.ButtonStyle(
-                padding=ft.Padding.symmetric(horizontal=10, vertical=2),
-                bgcolor=bg,
-                visual_density=ft.VisualDensity.COMPACT,
-            ),
-            on_click=lambda e, p=payload: send_virtual_key(p),
-        )
-
-    ft.Container(
-        content=ft.Row(
-            controls=[
-                _make_key_btn("ESC", b"\x1b"),
-                _make_key_btn("TAB", b"\t"),
-                btn_ctrl,
-                btn_alt,
-                _make_key_btn("▲", b"\x1b[A", bg="#45475A"),
-                _make_key_btn("▼", b"\x1b[B", bg="#45475A"),
-                _make_key_btn("◀", b"\x1b[D", bg="#45475A"),
-                _make_key_btn("▶", b"\x1b[C", bg="#45475A"),
-                _make_key_btn("-", b"-"),
-                _make_key_btn("/", b"/"),
-                _make_key_btn("|", b"|"),
-                _make_key_btn("~", b"~"),
-            ],
-            scroll=ft.ScrollMode.AUTO,
-            spacing=6,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        ),
-        padding=ft.Padding(6, 4, 6, 4),
-        bgcolor="#181825",
-        border=ft.Border.only(top=ft.BorderSide(1, "#313244")),
-    )
-
-    # Subtle horizontal scroll affordance for the extra-keys strip.
-    ft.Container(
-        content=ft.Row(
-            controls=[
-                ft.Container(
-                    expand=True,
-                    height=2,
-                    gradient=ft.LinearGradient(
-                        begin=ft.Alignment.CENTER_LEFT,
-                        end=ft.Alignment.CENTER_RIGHT,
-                        colors=["#45475A", "#18182500"],
-                    ),
-                ),
-                ft.Container(
-                    expand=True,
-                    height=2,
-                    gradient=ft.LinearGradient(
-                        begin=ft.Alignment.CENTER_RIGHT,
-                        end=ft.Alignment.CENTER_LEFT,
-                        colors=["#45475A", "#18182500"],
-                    ),
-                ),
-            ],
-        ),
-        padding=ft.Padding.only(left=6, right=6, bottom=2),
-    )
-
-    # ─── Search field (inline on wide screens) ──────────────────
-    search_field = ft.TextField(
-        hint_text="Search…",
-        height=34,
-        width=150,
-        text_size=12,
-        content_padding=ft.Padding.symmetric(horizontal=10, vertical=2),
-        bgcolor="#1E1E2E",
-        border_color="#45475A",
-        on_submit=do_search_next,  # Enter steps to the next match
-    )
-    search_btn = ft.IconButton(
-        icon=ft.Icons.SEARCH,
-        icon_size=18,
-        tooltip="Search",
-        style=ft.ButtonStyle(padding=4, visual_density=ft.VisualDensity.COMPACT),
-        on_click=do_search,
-    )
+    # ─── AppBar controls ───────────────────────────────────────
     zoom_out_btn = ft.IconButton(
         icon=ft.Icons.ZOOM_OUT,
         icon_size=18,
@@ -753,25 +553,22 @@ def main(page: ft.Page):
         ],
     )
 
-    def _build_settings_items():
+    # ─── Settings popup (gear icon in AppBar) ──────────────────
+    def _settings_items():
         cur_theme = active_theme_name
         cur_cursor = mt.cursor_style or "block"
         blink = bool(mt.cursor_blink)
 
         def item(text):
             return ft.PopupMenuItem(
-                content=ft.Text(text, size=11, weight=ft.FontWeight.BOLD),
-                disabled=True,
+                content=ft.Text(text, size=11, weight=ft.FontWeight.BOLD), disabled=True
             )
 
         def clickable(text, active, handler):
-            items = [ft.Text(text, size=13), ft.Container(expand=True)]
+            ctrls = [ft.Text(text, size=13), ft.Container(expand=True)]
             if active:
-                items.append(ft.Icon(ft.Icons.CHECK, size=16))
-            return ft.PopupMenuItem(
-                content=ft.Row(controls=items),
-                on_click=handler,
-            )
+                ctrls.append(ft.Icon(ft.Icons.CHECK, size=16))
+            return ft.PopupMenuItem(content=ft.Row(controls=ctrls), on_click=handler)
 
         return [
             item("Theme"),
@@ -806,12 +603,12 @@ def main(page: ft.Page):
         icon_size=20,
         tooltip="Settings",
         style=ft.ButtonStyle(padding=4, visual_density=ft.VisualDensity.COMPACT),
-        items=_build_settings_items(),
+        items=_settings_items(),
         on_open=lambda e: _refresh_settings(),
     )
 
     def _refresh_settings():
-        settings_popup.items = _build_settings_items()
+        settings_popup.items = _settings_items()
         settings_popup.update()
 
     def _set_theme(name):
@@ -819,14 +616,14 @@ def main(page: ft.Page):
         active_theme_name = name
         mt.theme = THEMES[name]
         mt.update()
-        page.show_snack_bar(
+        page.show_dialog(
             ft.SnackBar(ft.Text(f"Theme: {name}"), bgcolor="#313244", duration=1200)
         )
 
     def _set_cursor(style):
         mt.cursor_style = style
         mt.update()
-        page.show_snack_bar(
+        page.show_dialog(
             ft.SnackBar(ft.Text(f"Cursor: {style}"), bgcolor="#313244", duration=1200)
         )
 
@@ -834,27 +631,12 @@ def main(page: ft.Page):
         mt.cursor_blink = not mt.cursor_blink
         mt.update()
         state = "on" if mt.cursor_blink else "off"
-        page.show_snack_bar(
+        page.show_dialog(
             ft.SnackBar(ft.Text(f"Blink: {state}"), bgcolor="#313244", duration=1200)
         )
 
-    def build_overflow():
-        return ft.PopupMenuButton(
-            icon=ft.Icons.MORE_VERT,
-            icon_size=20,
-            tooltip="More",
-            style=ft.ButtonStyle(padding=4, visual_density=ft.VisualDensity.COMPACT),
-            items=[
-                ft.PopupMenuItem(
-                    content=ft.Text("Search"), on_click=lambda e: search_field.focus()
-                ),
-                ft.PopupMenuItem(content=ft.Text("Zoom In"), on_click=zoom_in),
-                ft.PopupMenuItem(content=ft.Text("Zoom Out"), on_click=zoom_out),
-            ],
-        )
-
+    # ─── AppBar ────────────────────────────────────────────────
     def build_appbar():
-        wide = (page.width or 0) >= COMPACT_THRESHOLD
         if HAS_POSIX_PTY or HAS_WIN_PTY or HAS_ANDROID_SUBPROCESS:
             left = engine_dropdown
         else:
@@ -867,25 +649,16 @@ def main(page: ft.Page):
                 border_radius=4,
             )
 
-        # Center: search on wide, empty on narrow
-        center = ft.Row(
-            controls=[search_field, search_btn] if wide else [ft.Container()],
-            alignment=ft.MainAxisAlignment.CENTER,
-            spacing=4,
-        )
-
-        # Right: demos + settings + zoom on wide, kebab on narrow
-        right: list[ft.Control] = [demos_popup, settings_popup]
-        if wide:
-            right.extend([zoom_out_btn, zoom_in_btn])
-        else:
-            right.append(build_overflow())
+        right: list[ft.Control] = [
+            demos_popup,
+            settings_popup,
+            zoom_out_btn,
+            zoom_in_btn,
+        ]
 
         return ft.AppBar(
             leading=left,
             leading_width=160,
-            title=center,
-            center_title=True,
             toolbar_height=48,
             adaptive=True,
             bgcolor="#181825",
@@ -909,24 +682,6 @@ def main(page: ft.Page):
             expand=True,
         )
     )
-
-    # Rebuild the AppBar responsively only when the wide/narrow state flips,
-    # to avoid re-parenting controls on every resize tick.
-    _last_wide = (page.width or 0) >= COMPACT_THRESHOLD
-
-    def on_resize(e):
-        nonlocal appbar, _last_wide
-        wide = (page.width or 0) >= COMPACT_THRESHOLD
-        if wide == _last_wide:
-            return
-        _last_wide = wide
-        new_bar = build_appbar()
-        col = page.controls[0].content
-        col.controls[0] = new_bar
-        appbar = new_bar
-        page.update()
-
-    page.on_resize = on_resize
 
     if active_engine == "Local OS PTY":
         if HAS_POSIX_PTY:

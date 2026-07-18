@@ -1,4 +1,4 @@
-"""Root entrypoint for FletTerminal Cross-Platform Studio.
+"""Root entrypoint for FletTerminal Cross-Platform Demo.
 
 Forwards directly to `examples/flet_terminal_example/src/main.py` for easy testing with `flet run` or `flet build`.
 """

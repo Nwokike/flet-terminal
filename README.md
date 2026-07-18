@@ -116,16 +116,16 @@ work identically on `MobileTerminal`.
 
 ## Multi-platform demo binaries
 
-Want to try the full Studio app (with PTY integration, stress tests, Termux-style
+Want to try the full Demo app (with PTY integration, stress tests, Termux-style
 virtual keys) before integrating into your own project?
 
 | Platform | Download | Engine |
 | :------- | :------: | :----- |
-| 📱 **Android (ARM64)** | [fletterminalstudio-arm64-v8a.apk](https://github.com/Nwokike/flet-terminal/releases/latest/download/fletterminalstudio-arm64-v8a.apk) | Basic Shell / Demo |
-| 📱 **Android (ARMv7)** | [fletterminalstudio-armeabi-v7a.apk](https://github.com/Nwokike/flet-terminal/releases/latest/download/fletterminalstudio-armeabi-v7a.apk) | Basic Shell / Demo |
-| 📱 **Android (x86_64)** | [fletterminalstudio-x86_64.apk](https://github.com/Nwokike/flet-terminal/releases/latest/download/fletterminalstudio-x86_64.apk) | Basic Shell / Demo |
-| 🖥️ **Windows portable** | [FletTerminalStudio_0.2.0_windows_x64.zip](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalStudio_0.2.0_windows_x64.zip) | Local PTY / Demo |
-| 🐧 **Linux standalone** | [FletTerminalStudio_0.2.0_linux_x86_64.tar.gz](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalStudio_0.2.0_linux_x86_64.tar.gz) | Local PTY / Demo |
+| 📱 **Android (ARM64)** | [fletterminaldemo-arm64-v8a.apk](https://github.com/Nwokike/flet-terminal/releases/latest/download/fletterminaldemo-arm64-v8a.apk) | Basic Shell / Demo |
+| 📱 **Android (ARMv7)** | [fletterminaldemo-armeabi-v7a.apk](https://github.com/Nwokike/flet-terminal/releases/latest/download/fletterminaldemo-armeabi-v7a.apk) | Basic Shell / Demo |
+| 📱 **Android (x86_64)** | [fletterminaldemo-x86_64.apk](https://github.com/Nwokike/flet-terminal/releases/latest/download/fletterminaldemo-x86_64.apk) | Basic Shell / Demo |
+| 🖥️ **Windows portable** | [FletTerminalDemo_0.2.0_windows_x64.zip](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalDemo_0.2.0_windows_x64.zip) | Local PTY / Demo |
+| 🐧 **Linux standalone** | [FletTerminalDemo_0.2.0_linux_x86_64.tar.gz](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalDemo_0.2.0_linux_x86_64.tar.gz) | Local PTY / Demo |
 
 ### Engine availability by platform
 
@@ -318,7 +318,7 @@ threading.Thread(target=reader, daemon=True).start()
 
 ### Virtual accessory keys (Termux-style)
 
-The Studio app ships a toolbar of soft-key buttons (`ESC`, `TAB`, `CTRL`, `ALT`,
+The Demo app ships a toolbar of soft-key buttons (`ESC`, `TAB`, `CTRL`, `ALT`,
 arrow keys, `-`, `/`, `|`, `~`) with sticky modifier toggles. When `CTRL` is
 active, the next letter keystroke becomes a control code (`A` → `\x01`). `ALT`
 prefixes the next keystroke with `\x1b`. Modifiers auto-reset after use.

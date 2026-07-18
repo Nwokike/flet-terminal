@@ -76,11 +76,11 @@ jobs:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
           cd examples/flet_terminal_example
-          uv run flet build linux --yes --project fletterminalstudio --product "Terminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
+          uv run flet build linux --yes --project fletterminaldemo --product "Terminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
       - name: Package Universal Linux tar.gz
         run: |
           mkdir -p build/dist
-          tar -czf build/dist/FletTerminalStudio_${{ env.BUILD_VERSION }}_linux_x86_64.tar.gz -C examples/flet_terminal_example/build/linux .
+          tar -czf build/dist/FletTerminalDemo_${{ env.BUILD_VERSION }}_linux_x86_64.tar.gz -C examples/flet_terminal_example/build/linux .
       - name: Upload directly to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -107,12 +107,12 @@ jobs:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
           cd examples/flet_terminal_example
-          uv run flet build windows --yes --project fletterminalstudio --product "Terminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
+          uv run flet build windows --yes --project fletterminaldemo --product "Terminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
       - name: Package Windows Executable Zip
         shell: bash
         run: |
           mkdir -p build/dist
-          uv run python -c "import shutil; shutil.make_archive('build/dist/FletTerminalStudio_${{ env.BUILD_VERSION }}_windows_x64', 'zip', 'examples/flet_terminal_example/build/windows')"
+          uv run python -c "import shutil; shutil.make_archive('build/dist/FletTerminalDemo_${{ env.BUILD_VERSION }}_windows_x64', 'zip', 'examples/flet_terminal_example/build/windows')"
       - name: Upload directly to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -144,7 +144,7 @@ jobs:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
           cd examples/flet_terminal_example
-          uv run flet build apk --yes --project fletterminalstudio --product "Terminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} --split-per-abi -v
+          uv run flet build apk --yes --project fletterminaldemo --product "Terminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} --split-per-abi -v
       - name: Upload directly to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -175,7 +175,7 @@ jobs:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
           cd examples/flet_terminal_example
-          uv run flet build web --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
+          uv run flet build web --yes --project fletterminaldemo --product "FletTerminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
       - name: Patch base href for GitHub Pages subpath
         run: |
           sed -i 's|<base href="/">|<base href="/flet-terminal/">|' examples/flet_terminal_example/build/web/index.html

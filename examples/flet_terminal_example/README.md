@@ -1,4 +1,4 @@
-# FletTerminal Cross-Platform Studio & Example
+# FletTerminal Cross-Platform Demo & Example
 
 This folder contains the official multi-engine test harness and example app for [`flet-terminal`](https://github.com/Nwokike/flet-terminal).
 
