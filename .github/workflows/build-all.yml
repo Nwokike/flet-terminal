@@ -175,7 +175,10 @@ jobs:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
           cd examples/flet_terminal_example
-          uv run flet build web --yes --project fletterminalstudio --product "Terminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
+          uv run flet build web --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
+      - name: Patch base href for GitHub Pages subpath
+        run: |
+          sed -i 's|<base href="/">|<base href="/flet-terminal/">|' examples/flet_terminal_example/build/web/index.html
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload Pages artifact

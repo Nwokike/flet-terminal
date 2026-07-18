@@ -116,6 +116,7 @@ class MobileTerminal(ft.Column):
             if preset is not None:
                 terminal_kwargs["theme"] = preset
 
+        terminal_kwargs.setdefault("expand", True)
         self._terminal = Terminal(**terminal_kwargs)
         self._extra_keys = list(extra_keys or DEFAULT_EXTRA_KEYS)
         self._keys_visible = extra_keys_visible
@@ -168,6 +169,7 @@ class MobileTerminal(ft.Column):
             content=ft.Row(controls=[self._search_field, search_btn], spacing=4),
             padding=ft.Padding(6, 4, 6, 4),
             bgcolor="#181825",
+            border=ft.Border.only(bottom=ft.BorderSide(1, "#313244")),
         )
 
     def _do_search(self):
@@ -249,8 +251,8 @@ class MobileTerminal(ft.Column):
             payload = b"\x1b" + payload
             self._alt_active = False
             self._refresh_modifier_buttons()
-        if self._terminal._channel:
-            self._terminal.send_bytes(payload)
+        # Send via the public API — buffers if channel isn't ready yet.
+        self._terminal.send_bytes(payload)
 
     def _toggle_modifier(self, is_ctrl: bool):
         if is_ctrl:

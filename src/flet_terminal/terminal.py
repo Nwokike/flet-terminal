@@ -98,6 +98,7 @@ class Terminal(ft.LayoutControl):
         """Disposes resources and sockets when the terminal control is removed from tree."""
         super().will_unmount()
         self._dart_ready = False
+        self._pending_writes.clear()
         if self._on_unmount_callback:
             try:
                 self._on_unmount_callback()
@@ -116,7 +117,10 @@ class Terminal(ft.LayoutControl):
         payload = (
             data if isinstance(data, str) else data.decode("utf-8", errors="ignore")
         )
-        await self._invoke_method("write", {"data": payload})
+        try:
+            await self._invoke_method("write", {"data": payload})
+        except RuntimeError:
+            self._pending_writes.append((self.write_async, (data,)))
 
     def write(self, data: str | bytes):
         """Synchronous wrapper for write_async."""
@@ -137,7 +141,10 @@ class Terminal(ft.LayoutControl):
         except RuntimeError:
             self._pending_writes.append((self.clear_async, None))
             return
-        await self._invoke_method("clear")
+        try:
+            await self._invoke_method("clear")
+        except RuntimeError:
+            self._pending_writes.append((self.clear_async, None))
 
     def clear(self):
         """Synchronous wrapper for clear_async."""
@@ -158,7 +165,10 @@ class Terminal(ft.LayoutControl):
         except RuntimeError:
             self._pending_writes.append((self.focus_async, None))
             return
-        await self._invoke_method("focus")
+        try:
+            await self._invoke_method("focus")
+        except RuntimeError:
+            self._pending_writes.append((self.focus_async, None))
 
     def focus(self):
         """Synchronous wrapper for focus_async."""
@@ -184,7 +194,10 @@ class Terminal(ft.LayoutControl):
         except RuntimeError:
             self._pending_writes.append((self.search_async, (query, start)))
             return
-        await self._invoke_method("search", {"query": query, "start": start})
+        try:
+            await self._invoke_method("search", {"query": query, "start": start})
+        except RuntimeError:
+            self._pending_writes.append((self.search_async, (query, start)))
 
     def search(self, query: str, start: int = 0):
         """Synchronous wrapper for search_async."""
@@ -205,7 +218,10 @@ class Terminal(ft.LayoutControl):
         except RuntimeError:
             self._pending_writes.append((self.clear_selection_async, None))
             return
-        await self._invoke_method("clear_selection")
+        try:
+            await self._invoke_method("clear_selection")
+        except RuntimeError:
+            self._pending_writes.append((self.clear_selection_async, None))
 
     def clear_selection(self):
         """Synchronous wrapper for clear_selection_async."""
@@ -226,7 +242,10 @@ class Terminal(ft.LayoutControl):
         except RuntimeError:
             self._pending_writes.append((self.select_all_async, None))
             return
-        await self._invoke_method("select_all")
+        try:
+            await self._invoke_method("select_all")
+        except RuntimeError:
+            self._pending_writes.append((self.select_all_async, None))
 
     def select_all(self):
         """Synchronous wrapper for select_all_async."""
