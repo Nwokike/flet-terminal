@@ -77,6 +77,13 @@ def build_demo_appbar(
         style=ft.ButtonStyle(padding=2, visual_density=ft.VisualDensity.COMPACT),
         on_click=lambda e: _change_font_size(page, mt, -1.0),
     )
+    toggle_search_btn = ft.IconButton(
+        icon=ft.Icons.SEARCH,
+        icon_size=18,
+        tooltip="Toggle Search Bar",
+        style=ft.ButtonStyle(padding=2, visual_density=ft.VisualDensity.COMPACT),
+        on_click=lambda e: mt.toggle_search(),
+    )
 
     return ft.AppBar(
         leading=engine_ctl,
@@ -84,7 +91,7 @@ def build_demo_appbar(
         toolbar_height=48,
         adaptive=True,
         bgcolor="#181825",
-        actions=[demos_popup, zoom_out_btn, zoom_in_btn],
+        actions=[demos_popup, toggle_search_btn, zoom_out_btn, zoom_in_btn],
         actions_padding=ft.Padding.only(right=8),
     )
 
@@ -93,13 +100,3 @@ def _change_font_size(page: ft.Page, mt: Any, delta: float):
     new_size = max(8.0, min(36.0, (mt._terminal.font_size or 13.0) + delta))
     mt._terminal.font_size = new_size
     mt._terminal.update()
-
-    page.overlay = [c for c in page.overlay if not isinstance(c, ft.SnackBar)]
-    sb = ft.SnackBar(
-        content=ft.Text(f"Font Size: {int(new_size)}px"),
-        bgcolor="#313244",
-        duration=1000,
-        open=True,
-    )
-    page.overlay.append(sb)
-    page.update()

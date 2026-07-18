@@ -17,6 +17,9 @@ build_number = 1
 [tool.flet.app]
 path = "src"
 
+[tool.flet.dev_packages]
+flet-terminal = "../.."
+
 [tool.uv.sources]
 flet-terminal = { path = "../..", editable = true }
 

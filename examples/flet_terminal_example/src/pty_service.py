@@ -171,7 +171,7 @@ class PTYService:
                         if not data:
                             break
                         self._on_output(data)
-                    except OSError:
+                    except (OSError, Exception):
                         break
 
             threading.Thread(target=read_loop, daemon=True).start()

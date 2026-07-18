@@ -332,7 +332,26 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     return LayoutControl(
       control: widget.control,
       child: RepaintBoundary(
-        child: termView,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            double width = constraints.maxWidth;
+            double height = constraints.maxHeight;
+            if (width.isInfinite || width <= 0) {
+              width = media.size.width > 0 ? media.size.width : 800.0;
+            }
+            if (height.isInfinite || height <= 0) {
+              height = media.size.height > 0 ? (media.size.height - 120.0).clamp(200.0, 2000.0) : 500.0;
+            }
+            if (constraints.maxWidth.isInfinite || constraints.maxHeight.isInfinite) {
+              return SizedBox(
+                width: width,
+                height: height,
+                child: termView,
+              );
+            }
+            return termView;
+          },
+        ),
       ),
     );
   }

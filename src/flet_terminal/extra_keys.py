@@ -43,6 +43,7 @@ class ExtraKeysBar(ft.Container):
         on_set_theme: Callable[[str], None] | None = None,
         on_set_cursor: Callable[[str], None] | None = None,
         on_toggle_blink: Callable[[], None] | None = None,
+        on_toggle_search: Callable[[], None] | None = None,
         keys: list[tuple[str, bytes | None]] | None = None,
     ):
         self._on_send_payload = on_send_payload
@@ -50,6 +51,7 @@ class ExtraKeysBar(ft.Container):
         self._on_set_theme = on_set_theme
         self._on_set_cursor = on_set_cursor
         self._on_toggle_blink = on_toggle_blink
+        self._on_toggle_search = on_toggle_search
         self._keys = keys or DEFAULT_EXTRA_KEYS
 
         self.ctrl_active = False
@@ -173,6 +175,12 @@ class ExtraKeysBar(ft.Container):
                     content=ft.Text("Toggle Cursor Blink"),
                     on_click=lambda e: (
                         self._on_toggle_blink() if self._on_toggle_blink else None
+                    ),
+                ),
+                ft.PopupMenuItem(
+                    content=ft.Text("Toggle Search Bar"),
+                    on_click=lambda e: (
+                        self._on_toggle_search() if self._on_toggle_search else None
                     ),
                 ),
             ],

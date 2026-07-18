@@ -25,7 +25,7 @@ def main(page: ft.Page):
 
     mt = MobileTerminal(
         show_extra_keys=True,
-        show_search=True,
+        show_search=False,
         show_settings=True,
         scrollback=10000,
         font_family="JetBrains Mono",
@@ -108,3 +108,6 @@ def main(page: ft.Page):
 
     # Start initial session once mounted
     switch_engine(pty_service.active_engine)
+
+
+ft.run(main)

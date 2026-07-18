@@ -135,7 +135,29 @@ class DemoEngine:
             self._running_test = False
             self._write(self._prompt)
 
-        threading.Thread(target=loop, daemon=True).start()
+        try:
+            threading.Thread(target=loop, daemon=True).start()
+        except RuntimeError:
+            import asyncio
+
+            async def async_loop():
+                for i in range(60):
+                    if not self._running_test:
+                        break
+                    self._write(
+                        f"\x1b[32m{' '.join(['10'[((i + j) * 7) % 2] for j in range(40)])}\x1b[0m\r\n".encode(
+                            "utf-8"
+                        )
+                    )
+                    await asyncio.sleep(0.05)
+                self._running_test = False
+                self._write(self._prompt)
+
+            try:
+                loop_obj = asyncio.get_running_loop()
+                loop_obj.create_task(async_loop())
+            except Exception:
+                pass
 
     def _run_stress_test(self):
         self._running_test = True
@@ -156,4 +178,26 @@ class DemoEngine:
             self._running_test = False
             self._write(self._prompt)
 
-        threading.Thread(target=loop, daemon=True).start()
+        try:
+            threading.Thread(target=loop, daemon=True).start()
+        except RuntimeError:
+            import asyncio
+
+            async def async_loop():
+                for i in range(1, 1001):
+                    if not self._running_test:
+                        break
+                    self._write(
+                        f"\x1b[36m[LINE {i:04d}]\x1b[0m High-speed throughput test payload string...\r\n".encode(
+                            "utf-8"
+                        )
+                    )
+                    await asyncio.sleep(0.002)
+                self._running_test = False
+                self._write(self._prompt)
+
+            try:
+                loop_obj = asyncio.get_running_loop()
+                loop_obj.create_task(async_loop())
+            except Exception:
+                pass

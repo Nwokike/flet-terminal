@@ -57,6 +57,7 @@ class MobileTerminal(ft.Column):
                 on_set_theme=self.set_theme,
                 on_set_cursor=self.set_cursor_style,
                 on_toggle_blink=self.toggle_cursor_blink,
+                on_toggle_search=self.toggle_search,
                 keys=extra_keys or DEFAULT_EXTRA_KEYS,
             )
             self._terminal.on_modifier_reset = lambda e: (
@@ -75,6 +76,28 @@ class MobileTerminal(ft.Column):
         self._terminal.ctrl_active = ctrl
         self._terminal.alt_active = alt
         self._terminal.update()
+
+    @property
+    def show_search(self) -> bool:
+        return self._search_bar.visible if self._search_bar else False
+
+    @show_search.setter
+    def show_search(self, val: bool):
+        if not self._search_bar and val:
+            self._search_bar = TerminalSearchBar(on_search=self._terminal.search)
+            if self._keys_bar and self._keys_bar in self.controls:
+                self.controls.insert(
+                    self.controls.index(self._keys_bar), self._search_bar
+                )
+            else:
+                self.controls.append(self._search_bar)
+        if self._search_bar:
+            self._search_bar.visible = val
+            self.update()
+
+    def toggle_search(self):
+        """Toggle visibility of the search bar."""
+        self.show_search = not self.show_search
 
     def set_theme(self, theme_name: str):
         """Switch the active terminal color theme by name."""
