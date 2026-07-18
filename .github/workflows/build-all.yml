@@ -39,7 +39,7 @@ jobs:
         run: |
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "RELEASE_NAME=FletTerminal Studio ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=Terminal Demo ${{ github.ref_name }}" >> $GITHUB_OUTPUT
             echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
           else
             SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
@@ -76,7 +76,7 @@ jobs:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
           cd examples/flet_terminal_example
-          uv run flet build linux --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
+          uv run flet build linux --yes --project fletterminalstudio --product "Terminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
       - name: Package Universal Linux tar.gz
         run: |
           mkdir -p build/dist
@@ -107,7 +107,7 @@ jobs:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
           cd examples/flet_terminal_example
-          uv run flet build windows --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
+          uv run flet build windows --yes --project fletterminalstudio --product "Terminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
       - name: Package Windows Executable Zip
         shell: bash
         run: |
@@ -144,7 +144,7 @@ jobs:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
           cd examples/flet_terminal_example
-          uv run flet build apk --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} --split-per-abi -v
+          uv run flet build apk --yes --project fletterminalstudio --product "Terminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} --split-per-abi -v
       - name: Upload directly to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -175,7 +175,7 @@ jobs:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
           cd examples/flet_terminal_example
-          uv run flet build web --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
+          uv run flet build web --yes --project fletterminalstudio --product "Terminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload Pages artifact

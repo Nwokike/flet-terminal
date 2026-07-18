@@ -77,6 +77,41 @@ def main(page: ft.Page):
 ft.run(main)
 ```
 
+### `MobileTerminal` — terminal + keys + search + settings (mobile-ready)
+
+For mobile apps, use `MobileTerminal` which bundles the terminal with a
+collapsible extra-keys bar (ESC, TAB, CTRL, ALT, arrows, symbols), a search bar,
+and a settings popup (theme/cursor/blink):
+
+```python
+import flet as ft
+from flet_terminal import MobileTerminal
+
+
+def main(page: ft.Page):
+    terminal = MobileTerminal(
+        font_size=13.0,
+        cursor_style="block",
+        theme={"background": "#1e1e2e", "foreground": "#cdd6f4"},
+        show_extra_keys=True,
+        show_search=True,
+        show_settings=True,
+    )
+
+    def handle_data(e):
+        terminal.write(f"You typed: {e.data}\r\n")
+
+    terminal.on_data = handle_data
+    # All Terminal properties/methods also work on MobileTerminal
+    page.add(terminal)
+
+ft.run(main)
+```
+
+All `Terminal` properties (`font_size`, `cursor_style`, `theme`, …), events
+(`on_data`, `on_resize`, …), and methods (`write()`, `clear()`, `search()`, …)
+work identically on `MobileTerminal`.
+
 ---
 
 ## Multi-platform demo binaries
@@ -134,6 +169,19 @@ All standard `LayoutControl` properties are available (`width`, `height`, `expan
 | `auto_focus` | `bool \| None` | `True` | Grab focus when mounted. |
 | `ctrl_active` | `bool \| None` | `False` | Sticky CTRL modifier (synced with Dart). |
 | `alt_active` | `bool \| None` | `False` | Sticky ALT modifier (synced with Dart). |
+
+### `MobileTerminal` additional properties
+
+All `Terminal` properties also work on `MobileTerminal`. These are specific:
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `show_extra_keys` | `bool` | `True` | Show the collapsible keys bar. |
+| `show_search` | `bool` | `True` | Show the search bar above terminal. |
+| `show_settings` | `bool` | `True` | Show settings gear in keys bar. |
+| `extra_keys_visible` | `bool` | `True` | Keys bar starts expanded. |
+| `extra_keys` | `list` | *(built-in)* | Customize key buttons. |
+| `theme_name` | `str \| None` | `None` | Theme preset: `"Dracula"`, `"JetBrains Dark"`, `"Matrix Green"`. |
 
 #### Theming
 

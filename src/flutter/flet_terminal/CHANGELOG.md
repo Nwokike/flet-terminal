@@ -1,5 +1,7 @@
 # 0.2.0
 
+- `MobileTerminal` — new bundled wrapper with collapsible extra-keys bar, search, and settings popup (theme/cursor/blink) built-in.
+- All `Terminal` properties and methods forwarded through `MobileTerminal` for drop-in compatibility.
 - UI redesign: compact AppBar toolbar, SubmenuButton settings/demos, responsive layout.
 - Search: now visibly selects the match and reports count via `on_selection_change`.
 - Readiness signal simplified (`did_mount` + `data_channel_open` + `before_event`).
