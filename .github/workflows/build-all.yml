@@ -175,7 +175,7 @@ jobs:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
           cd examples/flet_terminal_example
-          uv run flet build web --yes --base-href /flet-terminal/ --project fletterminaldemo --product "FletTerminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
+          uv run flet build web --yes --base-url /flet-terminal/ --project fletterminaldemo --product "FletTerminal Demo" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload Pages artifact
