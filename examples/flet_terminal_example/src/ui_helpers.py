@@ -23,12 +23,12 @@ def build_demo_appbar(
     if len(available_engines) > 1:
         engine_ctl = ft.Dropdown(
             value=active_engine,
-            options=[ft.dropdown.Option(k) for k in available_engines],
+            options=[ft.DropdownOption(k) for k in available_engines],
             width=170,
             text_size=11,
             height=32,
             content_padding=ft.Padding.symmetric(horizontal=8, vertical=0),
-            on_change=lambda e: on_switch_engine(e.control.value),
+            on_select=lambda e: on_switch_engine(e.control.value),
         )
     else:
         engine_ctl = ft.Container(

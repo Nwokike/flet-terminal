@@ -1,7 +1,15 @@
 """Root FletTerminal Demo Application setup and lifecycle manager."""
+# ruff: noqa: E402
 
 from __future__ import annotations
 import json
+import os
+import sys
+
+_cur_dir = os.path.dirname(os.path.abspath(__file__))
+if _cur_dir not in sys.path:
+    sys.path.insert(0, _cur_dir)
+
 import flet as ft
 from flet_terminal import MobileTerminal, BUILTIN_THEMES
 from pty_service import PTYService
