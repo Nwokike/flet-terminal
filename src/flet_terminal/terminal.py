@@ -43,13 +43,14 @@ class Terminal(ft.LayoutControl):
         self._on_bytes_handler = None
         if self.on_data_channel_open is None:
             self.on_data_channel_open = self._handle_data_channel_open
-        if self.on_mount is None:
-            self.on_mount = self._handle_mount
         self._on_unmount_callback = None
         self._pending_writes: list[Any] = []
+        # `_dart_ready` flips True once the control is mounted AND the Dart
+        # side has opened the PTY DataChannel — only then can bytes flow.
         self._dart_ready: bool = False
 
     def before_event(self, e: ft.ControlEvent):
+        # Every event proves the Dart side is alive and talking to us.
         self._mark_dart_ready()
         return super().before_event(e)
 
@@ -63,13 +64,10 @@ class Terminal(ft.LayoutControl):
             else:
                 self.page.run_task(task_fn)
 
-    def _handle_mount(self, e):
-        self._mark_dart_ready()
-
     def did_mount(self):
+        # Control is now in the page tree; surface any buffered work.
         super().did_mount()
-        if self._dart_ready:
-            self._mark_dart_ready()
+        self._mark_dart_ready()
 
     def _handle_data_channel_open(self, e: DataChannelOpenEvent):
         if e.channel_name == "pty" or not self._channel:
@@ -85,11 +83,16 @@ class Terminal(ft.LayoutControl):
             self._channel.on_bytes(handler)
 
     def send_bytes(self, payload: bytes):
-        """Sends raw bytes from Python to Dart (writing to terminal canvas)."""
-        if self._channel and self._dart_ready:
+        """Sends raw bytes from Python to Dart (writing to terminal canvas).
+
+        Raw bytes MUST travel over the DataChannel, never the string-based
+        MsgPack method protocol (`write`) — routing binary there corrupts it.
+        If the channel isn't open yet, buffer until the control is ready.
+        """
+        if self._channel is not None and self._dart_ready:
             self._channel.send(payload)
         else:
-            self.write(payload)
+            self._pending_writes.append((self.send_bytes, (payload,)))
 
     def will_unmount(self):
         """Disposes resources and sockets when the terminal control is removed from tree."""
@@ -110,7 +113,9 @@ class Terminal(ft.LayoutControl):
         except RuntimeError:
             self._pending_writes.append((self.write_async, (data,)))
             return
-        payload = data if isinstance(data, str) else data.decode("utf-8", errors="ignore")
+        payload = (
+            data if isinstance(data, str) else data.decode("utf-8", errors="ignore")
+        )
         await self._invoke_method("write", {"data": payload})
 
     def write(self, data: str | bytes):
@@ -165,26 +170,31 @@ class Terminal(ft.LayoutControl):
         except RuntimeError:
             self._pending_writes.append((self.focus_async, None))
 
-    async def search_async(self, query: str):
-        """Searches for text within the terminal scrollback ring buffer."""
+    async def search_async(self, query: str, start: int = 0):
+        """Searches for text within the terminal scrollback ring buffer.
+
+        `start` is the character offset to resume scanning from (used to step
+        through successive matches). The Dart side selects the match and
+        reports the total count via the `on_selection_change` event.
+        """
         try:
             if not self.page or not self._dart_ready:
-                self._pending_writes.append((self.search_async, (query,)))
+                self._pending_writes.append((self.search_async, (query, start)))
                 return
         except RuntimeError:
-            self._pending_writes.append((self.search_async, (query,)))
+            self._pending_writes.append((self.search_async, (query, start)))
             return
-        await self._invoke_method("search", {"query": query})
+        await self._invoke_method("search", {"query": query, "start": start})
 
-    def search(self, query: str):
+    def search(self, query: str, start: int = 0):
         """Synchronous wrapper for search_async."""
         try:
             if not self.page or not self._dart_ready:
-                self._pending_writes.append((self.search_async, (query,)))
+                self._pending_writes.append((self.search_async, (query, start)))
                 return
-            self.page.run_task(self.search_async, query)
+            self.page.run_task(self.search_async, query, start)
         except RuntimeError:
-            self._pending_writes.append((self.search_async, (query,)))
+            self._pending_writes.append((self.search_async, (query, start)))
 
     async def clear_selection_async(self):
         """Clears any active text selection in the terminal."""

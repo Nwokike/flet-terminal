@@ -7,7 +7,7 @@ on:
       build_version:
         description: "Build version"
         required: true
-        default: "0.1.0"
+        default: "0.2.0"
       build_number:
         description: "Build number"
         required: true
@@ -20,7 +20,7 @@ env:
   PYTHONUTF8: "1"
   FLET_CLI_NO_RICH_OUTPUT: "1"
   UV_PYTHON: "3.12"
-  BUILD_VERSION: ${{ inputs.build_version || '0.1.0' }}
+  BUILD_VERSION: ${{ inputs.build_version || '0.2.0' }}
   BUILD_NUMBER: ${{ inputs.build_number || '1' }}
 
 jobs:
@@ -71,23 +71,12 @@ jobs:
         run: |
           mkdir -p wheels
           uv build --wheel --out-dir wheels/ .
-      - name: Build Web PWA
+      - name: Build Web PWA (verify)
         env:
           PIP_FIND_LINKS: ${{ github.workspace }}/wheels
         run: |
           cd examples/flet_terminal_example
           uv run flet build web --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
-      - name: Package Web PWA Zip
-        run: |
-          mkdir -p build/dist
-          uv run python -c "import shutil; shutil.make_archive('build/dist/FletTerminalStudio_${{ env.BUILD_VERSION }}_web_pwa', 'zip', 'examples/flet_terminal_example/build/web')"
-      - name: Upload directly to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.prepare-release.outputs.TAG_NAME }}
-          files: build/dist/*.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ─── 2. Linux (.tar.gz Bundle & Portable Executable) ───
   build-linux:
@@ -183,3 +172,39 @@ jobs:
           files: examples/flet_terminal_example/build/apk/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─── 5. Deploy Web build to GitHub Pages ────────────────────
+  deploy-web:
+    needs: [prepare-release, build-web]
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pre-compile binary wheels
+        run: |
+          mkdir -p wheels
+          uv build --wheel --out-dir wheels/ .
+      - name: Build Web PWA
+        env:
+          PIP_FIND_LINKS: ${{ github.workspace }}/wheels
+        run: |
+          cd examples/flet_terminal_example
+          uv run flet build web --yes --project fletterminalstudio --product "FletTerminal Studio" --org ng.kiri --build-version ${{ env.BUILD_VERSION }} --build-number ${{ env.BUILD_NUMBER }} -v
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: examples/flet_terminal_example/build/web
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

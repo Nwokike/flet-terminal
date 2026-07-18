@@ -156,13 +156,61 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
       }
     } else if (name == "search") {
       final query = args["query"] as String?;
+      final start = (args["start"] as int? ?? 0);
       if (query != null && query.isNotEmpty && mounted) {
         final fullText = _terminal.buffer.getText();
-        final index = fullText.toLowerCase().indexOf(query.toLowerCase());
+        final lower = fullText.toLowerCase();
+        final needle = query.toLowerCase();
+
+        // Count every occurrence (not just the first).
+        int count = 0;
+        int from = 0;
+        while (from != -1) {
+          from = lower.indexOf(needle, from);
+          if (from != -1) {
+            count++;
+            from += needle.length;
+          }
+        }
+
+        // Find the next match at or after `start` (wraps to first).
+        int index = lower.indexOf(needle, start);
+        if (index == -1) index = lower.indexOf(needle);
         if (index != -1) {
-          widget.control.triggerEvent("selection_change", jsonEncode({"query": query, "found": true, "index": index}));
+          // Map the string offset to grid (col,row) so we can select the
+          // matched run. xterm has no find engine, so we surface the match by
+          // selecting it (visible highlight via the `selection` theme color).
+          final before = fullText.substring(0, index);
+          final startRow = before.split('\n').length - 1;
+          final startCol = before.length - before.lastIndexOf('\n') - 1;
+          final endRow = fullText.substring(0, index + query.length).split('\n').length - 1;
+          final endCol = (index + query.length) -
+              fullText.substring(0, index + query.length).lastIndexOf('\n') - 1;
+
+          _terminalController.setSelection(
+            _terminal.buffer.createAnchor(startCol, startRow),
+            _terminal.buffer.createAnchor(endCol, endRow),
+            mode: qt.SelectionMode.line,
+          );
+          widget.control.triggerEvent(
+            "selection_change",
+            jsonEncode({
+              "query": query,
+              "found": true,
+              "count": count,
+              "index": index,
+            }),
+          );
         } else {
-          widget.control.triggerEvent("selection_change", jsonEncode({"query": query, "found": false}));
+          widget.control.triggerEvent(
+            "selection_change",
+            jsonEncode({
+              "query": query,
+              "found": false,
+              "count": 0,
+              "index": -1,
+            }),
+          );
         }
       }
     }

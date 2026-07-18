@@ -1,6 +1,6 @@
 [project]
 name = "flet-terminal-example"
-version = "0.1.0"
+version = "0.2.0"
 description = "Cross-Platform Studio & Example app for flet-terminal"
 readme = "README.md"
 requires-python = ">=3.10"
