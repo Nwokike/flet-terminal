@@ -1,355 +1,154 @@
 # flet-terminal
 
-[![PyPI](https://img.shields.io/pypi/v/flet-terminal)](https://pypi.org/project/flet-terminal/)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/flet-terminal)](https://pypi.org/project/flet-terminal/)
-[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Live Demo](https://img.shields.io/badge/demo-github_pages-blue)](https://nwokike.github.io/flet-terminal/)
+A native, GPU-accelerated terminal control for [Flet](https://flet.dev/), built on top of [xterm.dart](https://github.com/PangolinDesktop/xterm.dart). 
 
-Native GPU-accelerated Terminal control for [Flet](https://flet.dev) (`ft.LayoutControl`),
-powered by [`xterm.dart`](https://pub.dev/packages/xterm). Exposes a high-throughput,
-low-latency terminal canvas with zero-copy binary streaming via Flet `DataChannel`s.
+`flet-terminal` provides high-performance VT100/ANSI terminal emulation across **Windows, Linux, macOS, Android, and Web**, utilizing low-latency binary `DataChannel` streaming to render thousands of lines per second without UI freezing.
 
-> **🌐 [Live Web Demo](https://nwokike.github.io/flet-terminal/) — try it in your browser instantly.**
+---
+
+## Features
+
+- **High-Throughput Binary Streaming**: Routes terminal data over Flet `DataChannel` directly to the `xterm.dart` canvas, bypassing string/MsgPack serialization overhead.
+- **Cross-Platform Compatibility**: Full feature parity across Desktop (`pty` / `winpty`), Mobile (`Android`), and Web (`WASM` / `Pyodide`).
+- **Responsive Mobile Virtual Keys**: `MobileTerminal` includes a customizable virtual accessory keyboard (`ESC`, `TAB`, `CTRL`, `ALT`, arrows) with sticky modifier toggles and collapsible state.
+- **Built-in Themes & Customization**: Supports instant switching between built-in color schemes (`Dracula`, `JetBrains Dark`, `Matrix Green`), customizable font families (`JetBrains Mono`), cursor shapes (`block`, `underline`, `bar`), and cursor blink.
+- **Interactive Search & Selection**: Built-in buffer search (`search`), scrollback control, and clipboard integration (`select_all`, `clear_selection`, right-click copy/paste).
 
 ---
 
 ## Installation
 
-Add `flet-terminal` to your Flet project:
+Install via `pip`:
 
 ```bash
-# pip
 pip install flet-terminal
+```
 
-# uv
+Or using `uv`:
+
+```bash
 uv add flet-terminal
 ```
 
-Or add to `pyproject.toml`:
-
-```toml
-[project]
-dependencies = [
-    "flet-terminal",
-    "flet>=0.86.0",
-]
-```
-
-Requires **Flet >= 0.86.0**.
-
 ---
 
-## Quick start — add terminal to your Flet app
+## Quickstart
+
+### 1. Basic Terminal (`Terminal`)
 
 ```python
 import flet as ft
-from flet_terminal import Terminal
-
+from flet_terminal import Terminal, BUILTIN_THEMES
 
 def main(page: ft.Page):
-    # 1. Instantiate the Terminal widget
-    terminal = Terminal(
+    page.theme_mode = ft.ThemeMode.DARK
+
+    term = Terminal(
+        scrollback=10000,
+        font_family="JetBrains Mono",
         font_size=13.0,
         cursor_style="block",
         cursor_blink=True,
-        theme={"background": "#1e1e2e", "foreground": "#cdd6f4"},
+        theme=BUILTIN_THEMES["Dracula"],
+        expand=True,
     )
 
-    # 2. Handle keystrokes (send to PTY, SSH, serial port…)
-    def handle_data(e):
-        terminal.write(f"You typed: {e.data}\r\n")
+    # Handle incoming bytes typed or pasted into the terminal
+    def on_terminal_input(data: bytes):
+        # Echo back or forward to a local OS shell / PTY process
+        term.send_bytes(data)
 
-    terminal.on_data = handle_data
+    term.set_on_bytes(on_terminal_input)
 
-    # 3. Add to your page layout
-    page.add(
-        ft.SafeArea(
-            ft.Container(content=terminal, expand=True, bgcolor="#1e1e2e",
-                         border_radius=8)
-        )
-    )
-
-    # 4. Write VT100/ANSI sequences directly from Python
-    terminal.write("\x1b[1;32mWelcome to flet-terminal!\x1b[0m\r\n$ ")
-
+    page.add(term)
+    term.write("\x1b[1;32mWelcome to FletTerminal!\x1b[0m\r\n> ")
 
 ft.run(main)
 ```
 
-### `MobileTerminal` — terminal + keys + search + settings (mobile-ready)
+### 2. Responsive Mobile Wrapper (`MobileTerminal`)
 
-For mobile apps, use `MobileTerminal` which bundles the terminal with a
-collapsible extra-keys bar (ESC, TAB, CTRL, ALT, arrows, symbols), a search bar,
-and a settings popup (theme/cursor/blink):
+`MobileTerminal` combines the core `Terminal` with a virtual extra-keys bar, sticky modifier buttons (`CTRL`, `ALT`), settings menu, and search bar:
 
 ```python
 import flet as ft
-from flet_terminal import MobileTerminal
-
+from flet_terminal import MobileTerminal, BUILTIN_THEMES
 
 def main(page: ft.Page):
-    terminal = MobileTerminal(
-        font_size=13.0,
-        cursor_style="block",
-        theme={"background": "#1e1e2e", "foreground": "#cdd6f4"},
+    mt = MobileTerminal(
         show_extra_keys=True,
         show_search=True,
         show_settings=True,
+        scrollback=10000,
+        font_family="JetBrains Mono",
+        font_size=13.0,
+        theme=BUILTIN_THEMES["JetBrains Dark"],
+        expand=True,
     )
 
-    def handle_data(e):
-        terminal.write(f"You typed: {e.data}\r\n")
+    def on_bytes(payload: bytes):
+        mt.send_bytes(payload)
 
-    terminal.on_data = handle_data
-    # All Terminal properties/methods also work on MobileTerminal
-    page.add(terminal)
+    mt.set_on_bytes(on_bytes)
+    page.add(mt)
 
 ft.run(main)
 ```
-
-All `Terminal` properties (`font_size`, `cursor_style`, `theme`, …), events
-(`on_data`, `on_resize`, …), and methods (`write()`, `clear()`, `search()`, …)
-work identically on `MobileTerminal`.
-
----
-
-## Multi-platform demo binaries
-
-Want to try the full Demo app (with PTY integration, stress tests, Termux-style
-virtual keys) before integrating into your own project?
-
-| Platform | Download | Engine |
-| :------- | :------: | :----- |
-| 📱 **Android (ARM64)** | [fletterminaldemo-arm64-v8a.apk](https://github.com/Nwokike/flet-terminal/releases/latest/download/fletterminaldemo-arm64-v8a.apk) | Basic Shell / Demo |
-| 📱 **Android (ARMv7)** | [fletterminaldemo-armeabi-v7a.apk](https://github.com/Nwokike/flet-terminal/releases/latest/download/fletterminaldemo-armeabi-v7a.apk) | Basic Shell / Demo |
-| 📱 **Android (x86_64)** | [fletterminaldemo-x86_64.apk](https://github.com/Nwokike/flet-terminal/releases/latest/download/fletterminaldemo-x86_64.apk) | Basic Shell / Demo |
-| 🖥️ **Windows portable** | [FletTerminalDemo_0.2.0_windows_x64.zip](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalDemo_0.2.0_windows_x64.zip) | Local PTY / Demo |
-| 🐧 **Linux standalone** | [FletTerminalDemo_0.2.0_linux_x86_64.tar.gz](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalDemo_0.2.0_linux_x86_64.tar.gz) | Local PTY / Demo |
-
-### Engine availability by platform
-
-| Platform | Real shell (`bash`/`powershell`) | Basic shell (`ls`, `cd`) | Demo Engine |
-| :------- | :-------------------------------: | :----------------------: | :---------: |
-| Linux / macOS | ✅ Local PTY | — | ✅ |
-| Windows | ✅ ConPTY | — | ✅ |
-| Android | ❌ (SELinux blocks PTY) | ✅ `subprocess.Popen` | ✅ |
-| Web (PWA) | ❌ (sandbox) | ❌ | ✅ |
-
----
-
-## Why flet-terminal
-
-- **Cross-platform**: Windows, Linux, macOS, Android, iOS, and Web from one Python control.
-- **Zero-copy binary streaming**: PTY bytes travel over a dedicated Flet `DataChannel`
-  (`send_bytes` / `on_bytes`), bypassing MsgPack/JSON encoding overhead.
-- **Full VT100/ANSI support**: true RGB colors, bold/italic, alternate screen buffers
-  (`htop` / `vim` mode), OSC 0/2 window titles, and bell (`\a`).
-- **Termux-style virtual accessory bar**: tactile soft-key buttons (`ESC`, `TAB`,
-  `CTRL`, `ALT`, arrows, symbols) with sticky modifier toggles for mobile keyboards.
 
 ---
 
 ## API Reference
 
-### Constructor properties
-
-All standard `LayoutControl` properties are available (`width`, `height`, `expand`,
-`opacity`, `tooltip`, `left`, `top`, `right`, `bottom`, `rotate`, `scale`, …).
+### `Terminal` Properties
 
 | Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `scrollback` | `int \| None` | `10000` | Max lines retained in the ring buffer. |
-| `font_family` | `str \| None` | `"JetBrains Mono"` | Terminal typeface. |
-| `font_size` | `float \| None` | `13.0` | Base font size in px. |
-| `cursor_blink` | `bool \| None` | `True` | Whether the cursor blinks. |
-| `cursor_style` | `str \| None` | `"block"` | One of `"block"`, `"underline"`, `"bar"`. |
-| `theme` | `dict \| None` | `None` | Color map (see [Theming](#theming)). |
-| `read_only` | `bool \| None` | `False` | Disable keyboard input. |
-| `auto_focus` | `bool \| None` | `True` | Grab focus when mounted. |
-| `ctrl_active` | `bool \| None` | `False` | Sticky CTRL modifier (synced with Dart). |
-| `alt_active` | `bool \| None` | `False` | Sticky ALT modifier (synced with Dart). |
+| :--- | :--- | :--- | :--- |
+| `scrollback` | `int` | `10000` | Maximum number of scrollback lines retained in the ring buffer. |
+| `font_family` | `str` | `"JetBrains Mono"` | Monospace font family for rendering text. |
+| `font_size` | `float` | `13.0` | Font point size. |
+| `cursor_style` | `str` | `"block"` | Cursor shape (`"block"`, `"underline"`, or `"bar"`). |
+| `cursor_blink` | `bool` | `True` | Whether the terminal cursor blinks continuously. |
+| `theme` | `dict` | `None` | Dictionary mapping ANSI color keys to hex/int colors. |
+| `read_only` | `bool` | `False` | When `True`, disables user keyboard input into the terminal canvas. |
+| `auto_focus` | `bool` | `True` | Automatically focuses the terminal when mounted. |
 
-### `MobileTerminal` additional properties
+### `Terminal` Methods
 
-All `Terminal` properties also work on `MobileTerminal`. These are specific:
+| Method | Arguments | Description |
+| :--- | :--- | :--- |
+| `send_bytes(payload)` | `bytes` | Sends binary data directly over the DataChannel to the terminal canvas. |
+| `write(data)` | `str \| bytes` | Writes text or escape sequences to the terminal. |
+| `clear()` | — | Clears the terminal scrollback and visible screen buffer. |
+| `focus()` | — | Requests keyboard focus on the terminal control. |
+| `search(query, start)` | `str, int` | Highlights and selects matching text in the scrollback buffer. |
+| `select_all()` | — | Selects all text currently in the buffer. |
+| `clear_selection()` | — | Clears any active selection. |
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `show_extra_keys` | `bool` | `True` | Show the collapsible keys bar. |
-| `show_search` | `bool` | `True` | Show the search bar above terminal. |
-| `show_settings` | `bool` | `True` | Show settings gear in keys bar. |
-| `extra_keys_visible` | `bool` | `True` | Keys bar starts expanded. |
-| `extra_keys` | `list` | *(built-in)* | Customize key buttons. |
-| `theme_name` | `str \| None` | `None` | Theme preset: `"Dracula"`, `"JetBrains Dark"`, `"Matrix Green"`. |
+### `Terminal` Events
 
-#### Theming
-
-`theme` accepts a dict of color keys. Unknown keys are ignored; missing keys
-fall back to xterm defaults.
-
-```python
-terminal.theme = {
-    "background": "#1E1E2E",
-    "foreground": "#CDD6F4",
-    "cursor": "#F5E0DC",
-    "selection": "#585B70",
-    "black": "#45475A", "red": "#F38BA8", "green": "#A6E3A1",
-    "yellow": "#F9E2AF", "blue": "#89B4FA", "magenta": "#F5C2E7",
-    "cyan": "#94E2D5", "white": "#BAC2DE",
-}
-```
-
-### Events
-
-Bind handlers by setting `terminal.on_<event>`:
-
-| Event | Handler | Payload |
-|-------|---------|---------|
-| `on_data` | `ControlEventHandler` | Keystrokes typed in the canvas (`e.data`). |
-| `on_resize` | `ControlEventHandler` | `{"cols": int, "rows": int}` (JSON string). |
-| `on_title_change` | `ControlEventHandler` | New window title (OSC 0/2). |
-| `on_bell` | `ControlEventHandler` | Bell (`\a`) — empty payload. |
-| `on_modifier_reset` | `ControlEventHandler` | Fired when a sticky CTRL/ALT modifier auto-resets after a keystroke. |
-| `on_selection_change` | `ControlEventHandler` | Result of `search()`: `{"query", "found", "count", "index"}`. |
-
-### Methods
-
-| Method | Description |
-|--------|-------------|
-| `write(data)` / `write_async(data)` | Send text or escape sequences to the terminal. |
-| `clear()` / `clear_async()` | Clear scrollback + visible buffer. |
-| `focus()` / `focus_async()` | Request keyboard focus. |
-| `search(query, start=0)` / `search_async(...)` | Find `query` in buffer, selects the match, reports count via `on_selection_change`. |
-| `clear_selection()` / `clear_selection_async()` | Clear active text selection. |
-| `select_all()` / `select_all_async()` | Select all buffer text. |
-| `send_bytes(payload)` | Send **raw bytes** over the `DataChannel` (binary-safe). |
-| `set_on_bytes(handler)` | Register callback for raw bytes from Dart → Python (e.g. feed a local PTY). |
-
-### Data flow
-
-```
-Keyboard ── on_data ──▶ Python ── send_bytes ──▶ DataChannel ──▶ xterm.dart
-   ▲                                                              │
-   └───────── on_bytes (set_on_bytes) ◀───────────────────────────┘
-```
+| Event | Handler | Description |
+| :--- | :--- | :--- |
+| `on_data` | `Callable[[ft.ControlEvent], None]` | Triggered when string-based text input occurs. |
+| `on_resize` | `Callable[[ft.ControlEvent], None]` | Fired when dimensions change. Event `data` contains JSON `{"cols": int, "rows": int}`. |
+| `on_title_change` | `Callable[[ft.ControlEvent], None]` | Triggered when OSC 0/2 title escape sequences are received. |
+| `on_bell` | `Callable[[ft.ControlEvent], None]` | Triggered when the bell character (`\a` / `0x07`) is received. |
+| `on_selection_change` | `Callable[[ft.ControlEvent], None]` | Fired when selection or search matches update. |
 
 ---
 
-## Using with a real shell
+## Built-in Themes
 
-### Linux / macOS (POSIX PTY)
-
-The extension doesn't manage PTY lifecycle — that's your app's job. Connect
-`on_data` and the data channel to a `pty` session:
+You can import and pass built-in presets from `flet_terminal.themes`:
 
 ```python
-import os, pty, threading
+from flet_terminal import BUILTIN_THEMES, get_theme
 
-master_fd, slave_fd = pty.openpty()
-pid = os.fork()
-if pid == 0:  # child
-    os.setsid()
-    os.dup2(slave_fd, 0); os.dup2(slave_fd, 1); os.dup2(slave_fd, 2)
-    os.execv("/bin/bash", ["bash", "-l"])
-else:  # parent
-    os.close(slave_fd)
-    terminal.on_data = lambda e: os.write(master_fd, e.data.encode())
-    terminal.set_on_bytes(lambda b: terminal.send_bytes(b))
-    def reader():
-        while data := os.read(master_fd, 4096):
-            terminal.send_bytes(data)
-    threading.Thread(target=reader, daemon=True).start()
+# Available: "Dracula", "JetBrains Dark", "Matrix Green"
+my_theme = get_theme("Dracula")
 ```
-
-### Windows (ConPTY via `pywinpty`)
-
-```python
-import winpty
-proc = winpty.PtyProcess.spawn("powershell.exe")
-terminal.on_data = lambda e: proc.write(e.data)
-terminal.set_on_bytes(lambda b: terminal.send_bytes(b))
-def reader():
-    while data := proc.read():
-        terminal.send_bytes(data.encode())
-threading.Thread(target=reader, daemon=True).start()
-```
-
-### Android (Basic shell via `subprocess`)
-
-On Android, `fork()` and PTY are blocked by SELinux. A basic shell using
-`subprocess.Popen` pipes is available for `ls`, `cd`, `cat`, `echo`, `grep` —
-full-screen apps (`vim`, `htop`) won't work without a PTY.
-
-```python
-import subprocess, threading, signal
-
-proc = subprocess.Popen(
-    ["sh"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-    stderr=subprocess.STDOUT,
-    env={**os.environ, "TERM": "xterm-256color"},
-)
-
-def handle_data(e):
-    data = e.data.encode()
-    if data == b"\x03":              # Ctrl+C
-        proc.send_signal(signal.SIGINT)
-    elif data == b"\x04":            # Ctrl+D
-        proc.stdin.close()
-    else:
-        proc.stdin.write(data)
-        proc.stdin.flush()
-
-terminal.on_data = handle_data
-terminal.set_on_bytes(lambda b: terminal.send_bytes(b))
-
-def reader():
-    while proc.poll() is None:
-        data = proc.stdout.read(4096)
-        if not data: break
-        terminal.send_bytes(data)
-
-threading.Thread(target=reader, daemon=True).start()
-```
-
----
-
-## Key features
-
-### Virtual accessory keys (Termux-style)
-
-The Demo app ships a toolbar of soft-key buttons (`ESC`, `TAB`, `CTRL`, `ALT`,
-arrow keys, `-`, `/`, `|`, `~`) with sticky modifier toggles. When `CTRL` is
-active, the next letter keystroke becomes a control code (`A` → `\x01`). `ALT`
-prefixes the next keystroke with `\x1b`. Modifiers auto-reset after use.
-
-### DataChannel streaming
-
-For high-throughput data (PTY I/O, log tailing), Flet's `DataChannel` provides a
-zero-copy binary pipe that bypasses the MsgPack control protocol entirely.
-`send_bytes()` and `set_on_bytes()` use this path.
-
-### Search
-
-`terminal.search(query)` scans the ring buffer, selects the first match (visible
-via the selection color), and reports the match count via `on_selection_change`.
-Call `search(query, start=...)` to step through successive matches.
-
----
-
-## Android note
-
-Android does not allow `os.fork()` or PTY creation for regular (non-root) apps
-due to SELinux policies. The pre-built demo APK defaults to a basic pipe-backed
-shell (`sh` via `subprocess.Popen`) which supports `ls`, `cd`, `cat`, `echo`,
-`grep`, and similar commands. For a full-featured terminal on Android, consider:
-
-- **Termux** — install Termux from F-Droid for a native PTY-powered shell.
-- **Remote SSH** — bundle an SSH client and connect to a remote server.
-- **Root** — on rooted devices, `fork()` and PTY both work.
 
 ---
 
 ## License
 
-[MIT License](LICENSE)
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

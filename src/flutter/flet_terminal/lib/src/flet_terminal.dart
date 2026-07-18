@@ -107,9 +107,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
       _channel = ch;
       _channelSub = ch.messages.listen((bytes) {
         if (mounted) {
-          setState(() {
-            _terminal.write(utf8.decode(bytes, allowMalformed: true));
-          });
+          _terminal.write(utf8.decode(bytes, allowMalformed: true));
         }
       });
 
@@ -125,16 +123,12 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   Future<dynamic> _handleMethodCall(String name, dynamic args) async {
     if (name == "write") {
       if (mounted) {
-        setState(() {
-          _terminal.write(args["data"] ?? "");
-        });
+        _terminal.write(args["data"] ?? "");
       }
     } else if (name == "clear") {
       if (mounted) {
-        setState(() {
-          _terminal.buffer.clearScrollback();
-          _terminal.buffer.clear();
-        });
+        _terminal.buffer.clearScrollback();
+        _terminal.buffer.clear();
       }
     } else if (name == "focus") {
       _focusNode.requestFocus();
@@ -229,6 +223,9 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
           final hex = int.tryParse(clean, radix: 16);
           if (hex != null) {
             if (clean.length == 6) {
+              if (key == "selection" || key == "searchHitBackground" || key == "searchHitBackgroundCurrent") {
+                return Color(hex | 0x66000000);
+              }
               return Color(hex | 0xFF000000);
             }
             return Color(hex);
@@ -306,7 +303,30 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
       cursorType: cursorType,
       alwaysShowCursor: cursorBlink,
       deleteDetection: isMobile,
-      keyboardType: TextInputType.emailAddress,
+      keyboardType: TextInputType.text,
+    );
+
+    termView = GestureDetector(
+      onSecondaryTapUp: (details) async {
+        if (_terminalController.selection != null) {
+          final selectedText = _terminal.buffer.getText(_terminalController.selection!);
+          if (selectedText.isNotEmpty) {
+            await Clipboard.setData(ClipboardData(text: selectedText));
+            _terminalController.clearSelection();
+            widget.control.triggerEvent("copy", selectedText);
+            return;
+          }
+        }
+        final data = await Clipboard.getData(Clipboard.kTextPlain);
+        if (data != null && data.text != null && data.text!.isNotEmpty) {
+          if (_channel != null) {
+            _channel!.send(utf8.encode(data.text!));
+          } else {
+            widget.control.triggerEvent("data", data.text!);
+          }
+        }
+      },
+      child: termView,
     );
 
     return LayoutControl(

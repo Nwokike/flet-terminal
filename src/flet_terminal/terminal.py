@@ -45,27 +45,30 @@ class Terminal(ft.LayoutControl):
             self.on_data_channel_open = self._handle_data_channel_open
         self._on_unmount_callback = None
         self._pending_writes: list[Any] = []
-        # `_dart_ready` flips True once the control is mounted AND the Dart
-        # side has opened the PTY DataChannel — only then can bytes flow.
         self._dart_ready: bool = False
+        self._channel_ready: bool = False
 
     def before_event(self, e: ft.ControlEvent):
-        # Every event proves the Dart side is alive and talking to us.
         self._mark_dart_ready()
         return super().before_event(e)
 
     def _mark_dart_ready(self):
         if not self._dart_ready:
             self._dart_ready = True
+        remaining = []
         while self._pending_writes and self.page and self._dart_ready:
             task_fn, args = self._pending_writes.pop(0)
+            if task_fn == self.send_bytes and not self._channel_ready:
+                remaining.append((task_fn, args))
+                continue
             if args is not None:
                 self.page.run_task(task_fn, *args)
             else:
                 self.page.run_task(task_fn)
+        if remaining:
+            self._pending_writes.extend(remaining)
 
     def did_mount(self):
-        # Control is now in the page tree; surface any buffered work.
         super().did_mount()
         self._mark_dart_ready()
 
@@ -74,6 +77,7 @@ class Terminal(ft.LayoutControl):
             self._channel = self.get_data_channel(e.channel_id)
             if self._on_bytes_handler:
                 self._channel.on_bytes(self._on_bytes_handler)
+            self._channel_ready = True
         self._mark_dart_ready()
 
     def set_on_bytes(self, handler):
@@ -83,13 +87,8 @@ class Terminal(ft.LayoutControl):
             self._channel.on_bytes(handler)
 
     def send_bytes(self, payload: bytes):
-        """Sends raw bytes from Python to Dart (writing to terminal canvas).
-
-        Raw bytes MUST travel over the DataChannel, never the string-based
-        MsgPack method protocol (`write`) — routing binary there corrupts it.
-        If the channel isn't open yet, buffer until the control is ready.
-        """
-        if self._channel is not None and self._dart_ready:
+        """Sends raw bytes from Python to Dart (writing to terminal canvas)."""
+        if self._channel is not None and self._channel_ready and self._dart_ready:
             self._channel.send(payload)
         else:
             self._pending_writes.append((self.send_bytes, (payload,)))
