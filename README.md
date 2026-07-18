@@ -76,16 +76,5 @@ ft.run(main)
 
 ---
 
-## 📚 Architecture & Research Documentation
-
-Detailed architectural notes, design comparisons, and execution walkthroughs are preserved in the `docs/` directory:
-- 📑 **[Implementation Plan](docs/implementation_plan.md)**: Technical architecture, DataChannel bridging, and PTY lifecycle management.
-- 📑 **[xterm.dart vs Alacritty Comparison](docs/xterm_comparison_research.md)**: Why `xterm.dart` (`qt.TerminalView`) was chosen over native Alacritty/PTY wrappers for universal cross-platform rendering.
-- 📑 **[Flet Extension Architecture Research](docs/flet_extensions_research.md)**: Deep dive into Flet `LayoutControl` lifecycle (`did_mount`, `invoke_method`, and event handlers).
-- 📑 **[Modularization & Packaging Plan](docs/modularization_plan.md)**: Project directory structure, wheel builds, and multi-platform CI pipelines.
-- 📑 **[Development Walkthrough](docs/walkthrough.md)**: Step-by-step summary of bug fixes, lifecycle race synchronization, and verification results.
-
----
-
 ## 📄 License
 MIT License
