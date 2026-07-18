@@ -149,6 +149,16 @@ def main(page: ft.Page):
                 terminal.send_bytes(b"\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
             elif text == "\x03":  # Ctrl+C
                 terminal.send_bytes(b"^C\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
+            elif text == "\x0c":  # Ctrl+L / Clear screen
+                terminal.clear()
+                terminal.write("\x1b[32m[Demo Shell]>\x1b[0m ")
+            elif text == "\t":    # Tab completion simulation
+                terminal.send_bytes(b"  ")
+            elif text == "\x1b":  # Escape
+                terminal.send_bytes(b"^[")
+            elif payload in (b"\x1b[A", b"\x1b[B", b"\x1b[C", b"\x1b[D"):
+                # Arrow keys navigation simulation
+                terminal.send_bytes(payload)
             else:
                 # Echo typed characters
                 terminal.send_bytes(payload)
@@ -437,6 +447,8 @@ def main(page: ft.Page):
             ],
         ),
         ft.Container(width=4),
+        ft.IconButton(ft.Icons.KEYBOARD, icon_size=16, tooltip="Toggle Virtual Key Bar", on_click=lambda e: toggle_extra_keys(e)),
+        ft.Container(width=4),
         title_status_text,
     ])
 
@@ -452,6 +464,38 @@ def main(page: ft.Page):
         border=ft.Border.only(bottom=ft.BorderSide(1, "#313244")),
     )
 
+    def send_virtual_key(payload: bytes):
+        handle_terminal_bytes(payload)
+
+    extra_keys_bar = ft.Container(
+        content=ft.Row(
+            controls=[
+                ft.Button("ESC", height=28, style=ft.ButtonStyle(padding=ft.Padding(8, 2, 8, 2), bgcolor="#313244", color="#CDD6F4", text_style=ft.TextStyle(size=11, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x1b")),
+                ft.Button("TAB", height=28, style=ft.ButtonStyle(padding=ft.Padding(8, 2, 8, 2), bgcolor="#313244", color="#CDD6F4", text_style=ft.TextStyle(size=11, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\t")),
+                ft.Button("CTRL+C", height=28, style=ft.ButtonStyle(padding=ft.Padding(8, 2, 8, 2), bgcolor="#F38BA8", color="#11111B", text_style=ft.TextStyle(size=11, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x03")),
+                ft.Button("↑", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#45475A", color="#CDD6F4", text_style=ft.TextStyle(size=13, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x1b[A")),
+                ft.Button("↓", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#45475A", color="#CDD6F4", text_style=ft.TextStyle(size=13, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x1b[B")),
+                ft.Button("←", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#45475A", color="#CDD6F4", text_style=ft.TextStyle(size=13, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x1b[D")),
+                ft.Button("→", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#45475A", color="#CDD6F4", text_style=ft.TextStyle(size=13, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x1b[C")),
+                ft.Button("|", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#313244", color="#CDD6F4", text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"|")),
+                ft.Button("/", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#313244", color="#CDD6F4", text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"/")),
+                ft.Button("-", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#313244", color="#CDD6F4", text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"-")),
+                ft.Button("~", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#313244", color="#CDD6F4", text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"~")),
+                ft.Button("CLR", height=28, style=ft.ButtonStyle(padding=ft.Padding(8, 2, 8, 2), bgcolor="#A6E3A1", color="#11111B", text_style=ft.TextStyle(size=11, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x0c")),
+            ],
+            scroll=ft.ScrollMode.ADAPTIVE,
+            spacing=6,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        ),
+        padding=ft.Padding(8, 4, 8, 4),
+        bgcolor="#181825",
+        border=ft.Border.only(top=ft.BorderSide(1, "#313244")),
+    )
+
+    def toggle_extra_keys(e):
+        extra_keys_bar.visible = not extra_keys_bar.visible
+        page.update()
+
     page.add(
         ft.SafeArea(
             content=ft.Container(
@@ -459,6 +503,7 @@ def main(page: ft.Page):
                     controls=[
                         toolbar,
                         terminal,
+                        extra_keys_bar,
                     ],
                     spacing=0,
                     expand=True,
