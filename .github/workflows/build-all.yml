@@ -82,7 +82,7 @@ jobs:
       - name: Package Web PWA Zip
         run: |
           mkdir -p build/dist
-          (cd examples/flet_terminal_example/build/web && zip -r ../../../../build/dist/FletTerminalStudio_${{ env.BUILD_VERSION }}_web_pwa.zip .)
+          uv run python -c "import shutil; shutil.make_archive('build/dist/FletTerminalStudio_${{ env.BUILD_VERSION }}_web_pwa', 'zip', 'examples/flet_terminal_example/build/web')"
       - name: Upload directly to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -145,7 +145,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p build/dist
-          (cd examples/flet_terminal_example/build/windows && zip -r ../../../../build/dist/FletTerminalStudio_${{ env.BUILD_VERSION }}_windows_x64.zip .)
+          uv run python -c "import shutil; shutil.make_archive('build/dist/FletTerminalStudio_${{ env.BUILD_VERSION }}_windows_x64', 'zip', 'examples/flet_terminal_example/build/windows')"
       - name: Upload directly to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
