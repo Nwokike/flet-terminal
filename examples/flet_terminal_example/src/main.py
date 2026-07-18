@@ -44,7 +44,7 @@ except ImportError:
 
 
 def main(page: ft.Page):
-    page.title = "FletTerminal Studio - Cross-Platform Multi-Engine Harness"
+    page.title = "FletTerminal Studio"
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 0
     page.bgcolor = "#12121A"
@@ -114,23 +114,39 @@ def main(page: ft.Page):
     pty_master_fd = None
     pty_process = None
 
-    # Status Bar indicators
-    title_status_text = ft.Text("📌 Title: FletTerminal", size=11, color="#89B4FA")
+    # Modifier key state (Termux-style toggles)
+    ctrl_active = False
+    alt_active = False
 
     # Event handlers from terminal
     def handle_title_change(e):
-        title_status_text.value = f"📌 Title: {e.data}"
         page.update()
 
     def handle_bell(e):
-        page.show_dialog(ft.SnackBar(ft.Text("🔔 Terminal Bell Triggered! (\a)"), bgcolor="#F38BA8", duration=1500))
+        page.show_dialog(ft.SnackBar(ft.Text("🔔 Terminal Bell Triggered! (\\a)"), bgcolor="#F38BA8", duration=1500))
 
     terminal.on_title_change = handle_title_change
     terminal.on_bell = handle_bell
 
     # Handle incoming bytes from Dart widget
     def handle_terminal_bytes(payload: bytes):
-        nonlocal pty_master_fd, pty_process
+        nonlocal pty_master_fd, pty_process, ctrl_active, alt_active
+        # Apply CTRL modifier: convert a-z/A-Z to control codes
+        if ctrl_active and len(payload) == 1:
+            code = payload[0]
+            if 97 <= code <= 122:  # a-z
+                payload = bytes([code - 96])
+            elif 65 <= code <= 90:  # A-Z
+                payload = bytes([code - 64])
+            ctrl_active = False
+            _update_modifier_buttons()
+
+        # Apply ALT modifier: prefix with ESC
+        if alt_active:
+            payload = b"\x1b" + payload
+            alt_active = False
+            _update_modifier_buttons()
+
         if active_engine == "Local OS PTY":
             if HAS_POSIX_PTY and pty_master_fd is not None:
                 try:
@@ -149,18 +165,18 @@ def main(page: ft.Page):
                 terminal.send_bytes(b"\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
             elif text == "\x03":  # Ctrl+C
                 terminal.send_bytes(b"^C\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
-            elif text == "\x0c":  # Ctrl+L / Clear screen
+            elif text == "\x0c":  # Ctrl+L
                 terminal.clear()
                 terminal.write("\x1b[32m[Demo Shell]>\x1b[0m ")
-            elif text == "\t":    # Tab completion simulation
+            elif text == "\x04":  # Ctrl+D
+                terminal.send_bytes(b"exit\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
+            elif text == "\t":
                 terminal.send_bytes(b"  ")
-            elif text == "\x1b":  # Escape
+            elif text == "\x1b":
                 terminal.send_bytes(b"^[")
             elif payload in (b"\x1b[A", b"\x1b[B", b"\x1b[C", b"\x1b[D"):
-                # Arrow keys navigation simulation
                 terminal.send_bytes(payload)
             else:
-                # Echo typed characters
                 terminal.send_bytes(payload)
 
     terminal.set_on_bytes(handle_terminal_bytes)
@@ -281,7 +297,7 @@ def main(page: ft.Page):
             active_engine = "ANSI Demo Engine"
             stop_pty()
             terminal.clear()
-            terminal.write("\x1b[1;36m=== FletTerminal VT100/ANSI Demo Engine Active ===\x1b[0m\r\nType commands or use test buttons above.\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
+            terminal.write("\x1b[32m[Demo Shell]>\x1b[0m ")
         page.update()
 
     # Test Button actions for Demo Engine
@@ -308,8 +324,8 @@ def main(page: ft.Page):
         terminal.write("║  CPU2 [||||||||||||||||||||||||||||                         42.1%]           ║\r\n")
         terminal.write("║  Mem  [|||||||||||||||||||||||||||||||||||||||||||||||||    3.8G/8.0G]       ║\r\n")
         terminal.write("║                                                                              ║\r\n")
-        terminal.write("║  Notice how live terminal state is isolated inside alternate buffer (\x1b[?1049h).  ║\r\n")
-        terminal.write("║  Pressing Exit below sends \x1b[?1049l to restore primary scrollback seamlessly! ║\r\n")
+        terminal.write("║  Notice how live terminal state is isolated inside alternate buffer (\\x1b[?1049h).  ║\r\n")
+        terminal.write("║  Pressing Exit below sends \\x1b[?1049l to restore primary scrollback seamlessly! ║\r\n")
         terminal.write("╚══════════════════════════════════════════════════════════════════════════════╝\r\n")
         
         def restore_screen():
@@ -321,7 +337,7 @@ def main(page: ft.Page):
     def trigger_osc_bell(e):
         terminal.write("\x1b]0;OSC 0 Title Update Test\a")
         terminal.write("\a")  # Bell
-        terminal.write("\r\n\x1b[33mSent window title change (OSC 0) and bell notification (\a)!\x1b[0m\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
+        terminal.write("\r\n\x1b[33mSent window title change (OSC 0) and bell notification (\\a)!\x1b[0m\r\n\x1b[32m[Demo Shell]>\x1b[0m ")
 
     # Accessory Controls
     def change_cursor_style(e):
@@ -349,11 +365,11 @@ def main(page: ft.Page):
 
     # Search Bar handler
     search_field = ft.TextField(
-        hint_text="Search in scrollback...",
-        height=32,
-        text_size=12,
-        content_padding=ft.Padding(10, 4, 10, 4),
-        expand=True,
+        hint_text="Search...",
+        height=30,
+        text_size=11,
+        content_padding=ft.Padding(8, 2, 8, 2),
+        width=140,
         bgcolor="#1E1E2E",
         border_color="#45475A",
     )
@@ -362,132 +378,198 @@ def main(page: ft.Page):
         if search_field.value:
             terminal.search(search_field.value)
 
+    # ─── Build toolbar: only essential controls visible, rest in overflow menu ───
+
+    # Engine selector (only on desktop)
     toolbar_controls = []
     if HAS_POSIX_PTY or HAS_WIN_PTY:
-        toolbar_controls.extend([
-            ft.Text("Engine:", size=11, color="#BAC2DE"),
+        toolbar_controls.append(
             ft.Dropdown(
                 options=[
                     ft.dropdown.Option("ANSI Demo Engine"),
                     ft.dropdown.Option("Local OS PTY"),
                 ],
                 value=active_engine,
-                height=26,
-                width=135,
+                height=30,
+                width=140,
                 text_size=11,
                 content_padding=ft.Padding(8, 0, 8, 0),
                 on_select=switch_engine,
             ),
-            ft.Container(width=2),
-        ])
+        )
     else:
-        toolbar_controls.extend([
+        toolbar_controls.append(
             ft.Container(
-                content=ft.Row(
-                    [ft.Icon(ft.Icons.TERMINAL, size=14, color="#A6E3A1"), ft.Text("VT100 Demo", size=11, weight=ft.FontWeight.BOLD, color="#A6E3A1")],
-                    spacing=4,
-                ),
-                padding=ft.Padding(6, 2, 6, 2),
+                content=ft.Text("VT100 Demo", size=11, weight=ft.FontWeight.BOLD, color="#A6E3A1"),
+                padding=ft.Padding(8, 4, 8, 4),
                 bgcolor="#313244",
                 border_radius=4,
             ),
-            ft.Container(width=2),
-        ])
+        )
 
-    toolbar_controls.extend([
-        ft.Text("Theme:", size=11, color="#BAC2DE"),
-        ft.Dropdown(
-            options=[ft.dropdown.Option(k) for k in themes.keys()],
-            value=active_theme_name,
-            height=26,
-            width=115,
-            text_size=11,
-            content_padding=ft.Padding(8, 0, 8, 0),
-            on_select=change_theme,
-        ),
-        ft.Container(width=2),
-        ft.Text("Cursor:", size=11, color="#BAC2DE"),
-        ft.Dropdown(
-            options=[
-                ft.dropdown.Option("Block"),
-                ft.dropdown.Option("Underline"),
-                ft.dropdown.Option("Bar"),
-            ],
-            value="Block",
-            height=26,
-            width=90,
-            text_size=11,
-            content_padding=ft.Padding(8, 0, 8, 0),
-            on_select=change_cursor_style,
-        ),
-        ft.Checkbox(label="Blink", value=True, on_change=toggle_cursor_blink, scale=0.75),
-        ft.Container(width=2),
-        ft.IconButton(ft.Icons.ZOOM_OUT, icon_size=16, tooltip="Zoom Out", on_click=zoom_out),
-        ft.IconButton(ft.Icons.ZOOM_IN, icon_size=16, tooltip="Zoom In", on_click=zoom_in),
-        ft.Container(width=2),
-        search_field,
-        ft.IconButton(ft.Icons.SEARCH, icon_size=16, tooltip="Search", on_click=do_search),
-        ft.Container(width=2),
+    # Demos popup
+    toolbar_controls.append(
         ft.PopupMenuButton(
-            tooltip="Run Demos & Benchmarks",
-            content=ft.Container(
-                content=ft.Row(
-                    [ft.Icon(ft.Icons.AUTO_AWESOME, size=14, color="#F9E2AF"), ft.Text("Demos", size=11, color="#F9E2AF")],
-                    spacing=4,
-                ),
-                padding=ft.Padding(6, 4, 6, 4),
-                bgcolor="#313244",
-                border_radius=4,
-            ),
+            icon=ft.Icons.AUTO_AWESOME,
+            icon_size=18,
+            icon_color="#F9E2AF",
+            tooltip="Demos",
             items=[
-                ft.PopupMenuItem(content=ft.Text("🎨 Color Matrix", size=11), on_click=run_ansi_matrix),
-                ft.PopupMenuItem(content=ft.Text("🚀 10k Line Stress", size=11), on_click=run_stress_test),
-                ft.PopupMenuItem(content=ft.Text("🖥️ Alt Screen (htop)", size=11), on_click=run_alternate_screen_test),
-                ft.PopupMenuItem(content=ft.Text("🔔 Bell & Title", size=11), on_click=trigger_osc_bell),
+                ft.PopupMenuItem(content=ft.Text("🎨 Color Matrix"), on_click=run_ansi_matrix),
+                ft.PopupMenuItem(content=ft.Text("🚀 10k Stress Test"), on_click=run_stress_test),
+                ft.PopupMenuItem(content=ft.Text("🖥️ Alt Screen"), on_click=run_alternate_screen_test),
+                ft.PopupMenuItem(content=ft.Text("🔔 Bell & Title"), on_click=trigger_osc_bell),
             ],
         ),
-        ft.Container(width=4),
-        ft.IconButton(ft.Icons.KEYBOARD, icon_size=16, tooltip="Toggle Virtual Key Bar", on_click=lambda e: toggle_extra_keys(e)),
-        ft.Container(width=4),
-        title_status_text,
+    )
+
+    # Search inline
+    toolbar_controls.extend([
+        search_field,
+        ft.IconButton(icon=ft.Icons.SEARCH, icon_size=16, tooltip="Search", on_click=do_search, style=ft.ButtonStyle(padding=0)),
     ])
+
+    # Spacer to push settings to the right
+    toolbar_controls.append(ft.Container(expand=True))
+
+    # Zoom
+    toolbar_controls.extend([
+        ft.IconButton(icon=ft.Icons.ZOOM_OUT, icon_size=16, tooltip="Zoom Out", on_click=zoom_out, style=ft.ButtonStyle(padding=0)),
+        ft.IconButton(icon=ft.Icons.ZOOM_IN, icon_size=16, tooltip="Zoom In", on_click=zoom_in, style=ft.ButtonStyle(padding=0)),
+    ])
+
+    # Settings overflow menu (theme, cursor, blink)
+    toolbar_controls.append(
+        ft.PopupMenuButton(
+            icon=ft.Icons.SETTINGS,
+            icon_size=18,
+            tooltip="Settings",
+            items=[
+                ft.PopupMenuItem(content=ft.Text("Theme")),
+                ft.PopupMenuItem(content=ft.Text("  Dracula"), on_click=lambda e: _set_theme("Dracula")),
+                ft.PopupMenuItem(content=ft.Text("  JetBrains Dark"), on_click=lambda e: _set_theme("JetBrains Dark")),
+                ft.PopupMenuItem(content=ft.Text("  Matrix Green"), on_click=lambda e: _set_theme("Matrix Green")),
+                ft.PopupMenuItem(content=ft.Text("Cursor Style")),
+                ft.PopupMenuItem(content=ft.Text("  Block"), on_click=lambda e: _set_cursor("block")),
+                ft.PopupMenuItem(content=ft.Text("  Underline"), on_click=lambda e: _set_cursor("underline")),
+                ft.PopupMenuItem(content=ft.Text("  Bar"), on_click=lambda e: _set_cursor("bar")),
+                ft.PopupMenuItem(content=ft.Text("Toggle Cursor Blink"), on_click=lambda e: _toggle_blink()),
+            ],
+        ),
+    )
+
+    # Toggle extra keys bar
+    toolbar_controls.append(
+        ft.IconButton(icon=ft.Icons.KEYBOARD, icon_size=18, tooltip="Virtual Keys", on_click=lambda e: toggle_extra_keys(e), style=ft.ButtonStyle(padding=0)),
+    )
+
+    def _set_theme(name):
+        nonlocal active_theme_name
+        active_theme_name = name
+        terminal.theme = themes[name]
+        terminal.update()
+
+    def _set_cursor(style):
+        terminal.cursor_style = style
+        terminal.update()
+
+    def _toggle_blink():
+        terminal.cursor_blink = not terminal.cursor_blink
+        terminal.update()
 
     toolbar = ft.Container(
         content=ft.Row(
             controls=toolbar_controls,
-            scroll=ft.ScrollMode.ADAPTIVE,
-            spacing=6,
+            spacing=4,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         ),
-        padding=ft.Padding(8, 4, 8, 4),
+        padding=ft.Padding(6, 4, 6, 4),
         bgcolor="#181825",
         border=ft.Border.only(bottom=ft.BorderSide(1, "#313244")),
     )
 
+    # ─── Termux-style extra keys bar with CTRL/ALT toggle modifiers ───
+
     def send_virtual_key(payload: bytes):
         handle_terminal_bytes(payload)
+
+    # CTRL and ALT toggle buttons (refs for styling updates)
+    btn_ctrl = ft.Button(
+        "CTRL", height=32,
+        style=ft.ButtonStyle(
+            padding=ft.Padding(10, 2, 10, 2),
+            bgcolor="#313244", color="#CDD6F4",
+            text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD),
+        ),
+        on_click=lambda e: _toggle_ctrl(),
+    )
+    btn_alt = ft.Button(
+        "ALT", height=32,
+        style=ft.ButtonStyle(
+            padding=ft.Padding(10, 2, 10, 2),
+            bgcolor="#313244", color="#CDD6F4",
+            text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD),
+        ),
+        on_click=lambda e: _toggle_alt(),
+    )
+
+    def _toggle_ctrl():
+        nonlocal ctrl_active
+        ctrl_active = not ctrl_active
+        _update_modifier_buttons()
+
+    def _toggle_alt():
+        nonlocal alt_active
+        alt_active = not alt_active
+        _update_modifier_buttons()
+
+    def _update_modifier_buttons():
+        btn_ctrl.style = ft.ButtonStyle(
+            padding=ft.Padding(10, 2, 10, 2),
+            bgcolor="#8BE9FD" if ctrl_active else "#313244",
+            color="#1E1E1E" if ctrl_active else "#CDD6F4",
+            text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD),
+        )
+        btn_alt.style = ft.ButtonStyle(
+            padding=ft.Padding(10, 2, 10, 2),
+            bgcolor="#8BE9FD" if alt_active else "#313244",
+            color="#1E1E1E" if alt_active else "#CDD6F4",
+            text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD),
+        )
+        page.update()
+
+    def _make_key_btn(label, payload, bg="#313244"):
+        return ft.Button(
+            label, height=32,
+            style=ft.ButtonStyle(
+                padding=ft.Padding(10, 2, 10, 2),
+                bgcolor=bg, color="#CDD6F4",
+                text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD),
+            ),
+            on_click=lambda e: send_virtual_key(payload),
+        )
 
     extra_keys_bar = ft.Container(
         content=ft.Row(
             controls=[
-                ft.Button("ESC", height=28, style=ft.ButtonStyle(padding=ft.Padding(8, 2, 8, 2), bgcolor="#313244", color="#CDD6F4", text_style=ft.TextStyle(size=11, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x1b")),
-                ft.Button("TAB", height=28, style=ft.ButtonStyle(padding=ft.Padding(8, 2, 8, 2), bgcolor="#313244", color="#CDD6F4", text_style=ft.TextStyle(size=11, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\t")),
-                ft.Button("CTRL+C", height=28, style=ft.ButtonStyle(padding=ft.Padding(8, 2, 8, 2), bgcolor="#F38BA8", color="#11111B", text_style=ft.TextStyle(size=11, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x03")),
-                ft.Button("↑", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#45475A", color="#CDD6F4", text_style=ft.TextStyle(size=13, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x1b[A")),
-                ft.Button("↓", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#45475A", color="#CDD6F4", text_style=ft.TextStyle(size=13, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x1b[B")),
-                ft.Button("←", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#45475A", color="#CDD6F4", text_style=ft.TextStyle(size=13, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x1b[D")),
-                ft.Button("→", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#45475A", color="#CDD6F4", text_style=ft.TextStyle(size=13, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x1b[C")),
-                ft.Button("|", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#313244", color="#CDD6F4", text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"|")),
-                ft.Button("/", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#313244", color="#CDD6F4", text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"/")),
-                ft.Button("-", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#313244", color="#CDD6F4", text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"-")),
-                ft.Button("~", height=28, style=ft.ButtonStyle(padding=ft.Padding(10, 2, 10, 2), bgcolor="#313244", color="#CDD6F4", text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"~")),
-                ft.Button("CLR", height=28, style=ft.ButtonStyle(padding=ft.Padding(8, 2, 8, 2), bgcolor="#A6E3A1", color="#11111B", text_style=ft.TextStyle(size=11, weight=ft.FontWeight.BOLD)), on_click=lambda e: send_virtual_key(b"\x0c")),
+                _make_key_btn("ESC", b"\x1b"),
+                _make_key_btn("TAB", b"\t"),
+                btn_ctrl,
+                btn_alt,
+                _make_key_btn("▲", b"\x1b[A", bg="#45475A"),
+                _make_key_btn("▼", b"\x1b[B", bg="#45475A"),
+                _make_key_btn("◀", b"\x1b[D", bg="#45475A"),
+                _make_key_btn("▶", b"\x1b[C", bg="#45475A"),
+                _make_key_btn("-", b"-"),
+                _make_key_btn("/", b"/"),
+                _make_key_btn("|", b"|"),
+                _make_key_btn("~", b"~"),
             ],
-            scroll=ft.ScrollMode.ADAPTIVE,
+            scroll=ft.ScrollMode.AUTO,
             spacing=6,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         ),
-        padding=ft.Padding(8, 4, 8, 4),
+        padding=ft.Padding(6, 4, 6, 4),
         bgcolor="#181825",
         border=ft.Border.only(top=ft.BorderSide(1, "#313244")),
     )
