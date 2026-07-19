@@ -80,7 +80,7 @@ jobs:
       - name: Package Universal Linux tar.gz
         run: |
           mkdir -p build/dist
-          tar -czf build/dist/FletTerminalDemo_${{ env.BUILD_VERSION }}_linux_x86_64.tar.gz -C examples/flet_terminal_example/build/linux .
+          tar -czf build/dist/FletTerminalDemo_linux_x86_64.tar.gz -C examples/flet_terminal_example/build/linux .
       - name: Upload directly to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -112,7 +112,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p build/dist
-          uv run python -c "import shutil; shutil.make_archive('build/dist/FletTerminalDemo_${{ env.BUILD_VERSION }}_windows_x64', 'zip', 'examples/flet_terminal_example/build/windows')"
+          uv run python -c "import shutil; shutil.make_archive('build/dist/FletTerminalDemo_windows_x64', 'zip', 'examples/flet_terminal_example/build/windows')"
       - name: Upload directly to GitHub Release
         uses: softprops/action-gh-release@v2
         with:

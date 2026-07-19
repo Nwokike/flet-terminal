@@ -1,8 +1,26 @@
 # flet-terminal
 
+<p align="center">
+  <a href="https://github.com/Nwokike/flet-terminal/releases/latest"><img src="https://img.shields.io/badge/Download-Demo%20Studio-orange?style=for-the-badge&logo=github&logoColor=white" alt="Download Demo" /></a>
+  <a href="https://pypi.org/project/flet-terminal/"><img src="https://img.shields.io/pypi/v/flet-terminal?style=for-the-badge&logo=pypi&logoColor=white" alt="PyPI" /></a>
+  <img src="https://img.shields.io/badge/Built%20with-Flet%200.86-00B0FF?style=for-the-badge&logo=flutter&logoColor=white" alt="Flet" />
+</p>
+
 A native, GPU-accelerated terminal control for [Flet](https://flet.dev/), built on top of [xterm.dart](https://github.com/PangolinDesktop/xterm.dart). 
 
 `flet-terminal` provides high-performance VT100/ANSI terminal emulation across **Windows, Linux, macOS, Android, and Web**, utilizing low-latency binary `DataChannel` streaming to render thousands of lines per second without UI freezing.
+
+---
+
+## Download Demo Studio
+
+Try the interactive **Flet Terminal Studio** demonstration app directly on your desktop:
+
+| Platform | Download | Notes |
+| :---: | :---: | :--- |
+| 🪟 **Windows (x64)** | [**FletTerminalDemo_windows_x64.zip**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalDemo_windows_x64.zip) | Portable Windows executable (`.exe`) |
+| 🐧 **Linux (x86_64)** | [**FletTerminalDemo_linux_x86_64.tar.gz**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalDemo_linux_x86_64.tar.gz) | Universal Linux tarball (`tar -xzf`) |
+| 📦 **All Releases** | [**View Releases Page**](https://github.com/Nwokike/flet-terminal/releases/latest) | Changelog and release notes |
 
 ---
 
