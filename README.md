@@ -1,7 +1,7 @@
 # flet-terminal
 
 <p align="center">
-  <a href="https://github.com/Nwokike/flet-terminal/releases/latest"><img src="https://img.shields.io/badge/Download-Demo%20Studio-orange?style=for-the-badge&logo=github&logoColor=white" alt="Download Demo" /></a>
+  <a href="https://github.com/Nwokike/flet-terminal/releases/latest"><img src="https://img.shields.io/badge/Download-Flet%20Terminal-orange?style=for-the-badge&logo=github&logoColor=white" alt="Download Flet Terminal" /></a>
   <a href="https://pypi.org/project/flet-terminal/"><img src="https://img.shields.io/pypi/v/flet-terminal?style=for-the-badge&logo=pypi&logoColor=white" alt="PyPI" /></a>
   <img src="https://img.shields.io/badge/Built%20with-Flet%200.86-00B0FF?style=for-the-badge&logo=flutter&logoColor=white" alt="Flet" />
 </p>
@@ -12,14 +12,14 @@ A native, GPU-accelerated terminal control for [Flet](https://flet.dev/), built 
 
 ---
 
-## Download Demo Studio
+## Download Flet Terminal
 
-Try the interactive **Flet Terminal Studio** demonstration app directly on your desktop:
+Try the standalone **Flet Terminal** desktop application directly on your OS:
 
 | Platform | Download | Notes |
 | :---: | :---: | :--- |
-| 🪟 **Windows (x64)** | [**FletTerminalDemo_windows_x64.zip**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalDemo_windows_x64.zip) | Portable Windows executable (`.exe`) |
-| 🐧 **Linux (x86_64)** | [**FletTerminalDemo_linux_x86_64.tar.gz**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminalDemo_linux_x86_64.tar.gz) | Universal Linux tarball (`tar -xzf`) |
+| 🪟 **Windows (x64)** | [**FletTerminal_windows_x64.zip**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminal_windows_x64.zip) | Portable Windows executable (`.exe`) |
+| 🐧 **Linux (x86_64)** | [**FletTerminal_linux_x86_64.tar.gz**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminal_linux_x86_64.tar.gz) | Universal Linux tarball (`tar -xzf`) |
 | 📦 **All Releases** | [**View Releases Page**](https://github.com/Nwokike/flet-terminal/releases/latest) | Changelog and release notes |
 
 ---
@@ -28,8 +28,8 @@ Try the interactive **Flet Terminal Studio** demonstration app directly on your 
 
 - **High-Throughput Binary Streaming**: Routes terminal data over Flet `DataChannel` directly to the `xterm.dart` canvas, bypassing string/MsgPack serialization overhead.
 - **Cross-Platform Compatibility**: Full feature parity across Desktop (`pty` / `winpty`), Mobile (`Android`), and Web (`WASM` / `Pyodide`).
-- **Responsive Mobile Virtual Keys**: `MobileTerminal` includes a customizable virtual accessory keyboard (`ESC`, `TAB`, `CTRL`, `ALT`, arrows) with sticky modifier toggles and collapsible state.
-- **Built-in Themes & Customization**: Supports instant switching between built-in color schemes (`Dracula`, `JetBrains Dark`, `Matrix Green`), customizable font families (`JetBrains Mono`), cursor shapes (`block`, `underline`, `bar`), and cursor blink.
+- **Responsive Mobile Wrapper & Zoom Controls**: `MobileTerminal` includes `zoom_in()`, `zoom_out()`, `reset_zoom()`, and a customizable virtual accessory keyboard (`ESC`, `TAB`, `CTRL`, `ALT`, arrows) with sticky modifier toggles and collapsible state.
+- **Dynamic Checkmarks & Built-in Themes**: Supports instant switching between built-in color schemes (`Dracula`, `JetBrains Dark`, `Matrix Green`), customizable font families (`JetBrains Mono`), cursor shapes (`block`, `underline`, `bar`), and cursor blink. Settings popup displays accurate checkmarks (`checked=True`) that dynamically tick as options change.
 - **Interactive Search & Selection**: Built-in buffer search (`search`), scrollback control, and clipboard integration (`select_all`, `clear_selection`, right-click copy/paste).
 
 ---
