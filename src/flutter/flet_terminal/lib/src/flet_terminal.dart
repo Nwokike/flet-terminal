@@ -22,6 +22,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   late final qt.Terminal _terminal;
   final qt.TerminalController _terminalController = qt.TerminalController();
   final FocusNode _focusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
   DataChannel? _channel;
   StreamSubscription<Uint8List>? _channelSub;
 
@@ -295,6 +296,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     Widget termView = qt.TerminalView(
       _terminal,
       controller: _terminalController,
+      scrollController: _scrollController,
       focusNode: _focusNode,
       theme: theme,
       textStyle: style,
@@ -372,12 +374,19 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     );
   }
 
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    }
+  }
+
   @override
   void dispose() {
     widget.control.removeInvokeMethodListener(_handleMethodCall);
     _channelSub?.cancel();
     _channel?.close();
     _focusNode.dispose();
+    _scrollController.dispose();
     _terminalController.dispose();
     super.dispose();
   }
