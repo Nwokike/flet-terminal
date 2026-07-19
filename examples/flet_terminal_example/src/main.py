@@ -10,10 +10,11 @@ _cur_dir = os.path.dirname(os.path.abspath(__file__))
 if _cur_dir not in sys.path:
     sys.path.insert(0, _cur_dir)
 
+import time
+import threading
 import flet as ft
 from flet_terminal import MobileTerminal, BUILTIN_THEMES
 from pty_service import PTYService
-from demo_engine import DemoEngine
 from ui_helpers import build_demo_appbar
 
 
@@ -45,15 +46,7 @@ def main(page: ft.Page):
         )
 
     pty_service = PTYService(on_output=on_pty_output, on_error=on_pty_error)
-    demo_engine = DemoEngine(write_fn=mt.send_bytes, clear_fn=mt.clear)
-
-    def handle_terminal_bytes(payload: bytes):
-        if pty_service.active_engine in ("Local OS PTY", "Android Local Shell"):
-            pty_service.write(payload)
-        else:
-            demo_engine.handle_input(payload)
-
-    mt.set_on_bytes(handle_terminal_bytes)
+    mt.set_on_bytes(pty_service.write)
 
     def handle_resize(e):
         try:
@@ -68,21 +61,45 @@ def main(page: ft.Page):
 
     def switch_engine(engine_name: str):
         mt.clear()
-        if engine_name in ("Local OS PTY", "Android Local Shell"):
-            pty_service.start_session(engine_name)
-        else:
-            pty_service.stop_session()
-            pty_service.active_engine = "ANSI Demo Engine"
-            demo_engine.start()
+        pty_service.start_session(engine_name)
         page.update()
 
     def run_matrix():
-        switch_engine("ANSI Demo Engine")
-        demo_engine._execute_command("matrix")
+        mt.write("\r\n\x1b[32m=== ANSI Color & Style Matrix ===\x1b[0m\r\n")
+        mt.write("\x1b[1mStandard & Bright ANSI Colors:\x1b[0m\r\n")
+        for i in range(8):
+            mt.write(f"\x1b[4{i}m   \x1b[0m ")
+        mt.write("\r\n")
+        for i in range(8):
+            mt.write(f"\x1b[10{i}m   \x1b[0m ")
+        mt.write("\r\n\x1b[32mStarting Matrix animation (3 seconds)...\x1b[0m\r\n")
+
+        def loop():
+            for i in range(30):
+                mt.send_bytes(
+                    f"\x1b[32m{' '.join(['10'[((i + j) * 7) % 2] for j in range(40)])}\x1b[0m\r\n".encode(
+                        "utf-8"
+                    )
+                )
+                time.sleep(0.05)
+            mt.send_bytes(b"\r\n\x1b[32mMatrix animation finished.\x1b[0m\r\n")
+
+        threading.Thread(target=loop, daemon=True).start()
 
     def run_stress():
-        switch_engine("ANSI Demo Engine")
-        demo_engine._execute_command("stress")
+        mt.write("\r\n\x1b[33mGenerating 1000 lines throughput test...\x1b[0m\r\n")
+
+        def loop():
+            for i in range(1, 1001):
+                mt.send_bytes(
+                    f"\x1b[36m[LINE {i:04d}]\x1b[0m High-speed throughput test payload string...\r\n".encode(
+                        "utf-8"
+                    )
+                )
+                time.sleep(0.001)
+            mt.send_bytes(b"\r\n\x1b[33mThroughput test complete.\x1b[0m\r\n")
+
+        threading.Thread(target=loop, daemon=True).start()
 
     def run_alt_screen():
         mt.write("\x1b[?1049h\x1b[H\x1b[2J")

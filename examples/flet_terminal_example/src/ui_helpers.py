@@ -31,9 +31,14 @@ def build_demo_appbar(
             on_select=lambda e: on_switch_engine(e.control.value),
         )
     else:
+        badge_text = (
+            active_engine
+            if active_engine
+            else (available_engines[0] if available_engines else "Local Shell")
+        )
         engine_ctl = ft.Container(
             content=ft.Text(
-                "VT100 Demo", size=11, weight=ft.FontWeight.BOLD, color="#A6E3A1"
+                badge_text, size=11, weight=ft.FontWeight.BOLD, color="#A6E3A1"
             ),
             padding=ft.Padding.symmetric(horizontal=8, vertical=4),
             bgcolor="#313244",

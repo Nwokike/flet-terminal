@@ -329,6 +329,8 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
       child: termView,
     );
 
+    final bottomInset = media.viewInsets.bottom;
+
     return LayoutControl(
       control: widget.control,
       child: RepaintBoundary(
@@ -342,14 +344,28 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
             if (height.isInfinite || height <= 0) {
               height = media.size.height > 0 ? (media.size.height - 120.0).clamp(200.0, 2000.0) : 500.0;
             }
+
+            Widget currentView = termView;
+            if (bottomInset > 0) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _scrollToBottom();
+              });
+              if (constraints.maxHeight.isInfinite || constraints.maxHeight + bottomInset >= media.size.height - 80.0) {
+                currentView = Padding(
+                  padding: EdgeInsets.only(bottom: bottomInset),
+                  child: currentView,
+                );
+              }
+            }
+
             if (constraints.maxWidth.isInfinite || constraints.maxHeight.isInfinite) {
               return SizedBox(
                 width: width,
                 height: height,
-                child: termView,
+                child: currentView,
               );
             }
-            return termView;
+            return currentView;
           },
         ),
       ),
