@@ -51,7 +51,7 @@ class MobileTerminal(ft.Column):
         self._keys_bar: ExtraKeysBar | None = None
         if show_extra_keys:
             self._keys_bar = ExtraKeysBar(
-                on_send_payload=self._terminal.send_bytes,
+                on_send_payload=self._terminal.send_input,
                 on_modifier_change=self._on_modifier_change,
                 show_settings=show_settings,
                 on_set_theme=self.set_theme,
@@ -142,6 +142,9 @@ class MobileTerminal(ft.Column):
 
     def send_bytes(self, payload: bytes):
         self._terminal.send_bytes(payload)
+
+    def send_input(self, payload: bytes):
+        self._terminal.send_input(payload)
 
     def write(self, data: str | bytes):
         self._terminal.write(data)

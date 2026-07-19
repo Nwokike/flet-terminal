@@ -306,10 +306,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
       alwaysShowCursor: cursorBlink,
       deleteDetection: isMobile,
       keyboardType: TextInputType.text,
-    );
-
-    termView = GestureDetector(
-      onSecondaryTapUp: (details) async {
+      onSecondaryTapUp: (details, offset) async {
         if (_terminalController.selection != null) {
           final selectedText = _terminal.buffer.getText(_terminalController.selection!);
           if (selectedText.isNotEmpty) {
@@ -321,14 +318,13 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
         }
         final data = await Clipboard.getData(Clipboard.kTextPlain);
         if (data != null && data.text != null && data.text!.isNotEmpty) {
-          if (_channel != null) {
-            _channel!.send(utf8.encode(data.text!));
+          if (_channelSub != null && _channel != null) {
+            _channel!.send(Uint8List.fromList(utf8.encode(data.text!)));
           } else {
             widget.control.triggerEvent("data", data.text!);
           }
         }
       },
-      child: termView,
     );
 
     final bottomInset = media.viewInsets.bottom;

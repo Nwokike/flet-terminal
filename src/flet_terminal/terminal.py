@@ -109,6 +109,11 @@ class Terminal(ft.LayoutControl):
             with self._lock:
                 self._pending_writes.append((self.send_bytes, (payload,)))
 
+    def send_input(self, payload: bytes):
+        """Forwards virtual key payload directly to the registered PTY input handler (`_on_bytes_handler`)."""
+        if self._on_bytes_handler:
+            self._on_bytes_handler(payload)
+
     def will_unmount(self):
         """Disposes resources and sockets when the terminal control is removed from tree."""
         super().will_unmount()
