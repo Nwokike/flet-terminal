@@ -182,52 +182,6 @@ class ExtraKeysBar(ft.Container):
                 disabled=True,
             ),
             ft.PopupMenuItem(
-                content=ft.Row(
-                    controls=[
-                        ft.Text(
-                            f"Font Size: {int(self.current_font_size)}px",
-                            expand=True,
-                            weight=ft.FontWeight.W_600,
-                        ),
-                        ft.IconButton(
-                            icon=ft.Icons.REMOVE_CIRCLE_OUTLINE,
-                            icon_size=18,
-                            tooltip="Zoom Out",
-                            style=ft.ButtonStyle(
-                                padding=0, visual_density=ft.VisualDensity.COMPACT
-                            ),
-                            on_click=lambda e: (
-                                self._on_zoom_out() if self._on_zoom_out else None
-                            ),
-                        ),
-                        ft.IconButton(
-                            icon=ft.Icons.ADD_CIRCLE_OUTLINE,
-                            icon_size=18,
-                            tooltip="Zoom In",
-                            style=ft.ButtonStyle(
-                                padding=0, visual_density=ft.VisualDensity.COMPACT
-                            ),
-                            on_click=lambda e: (
-                                self._on_zoom_in() if self._on_zoom_in else None
-                            ),
-                        ),
-                        ft.IconButton(
-                            icon=ft.Icons.RESTART_ALT,
-                            icon_size=18,
-                            tooltip="Reset Zoom",
-                            style=ft.ButtonStyle(
-                                padding=0, visual_density=ft.VisualDensity.COMPACT
-                            ),
-                            on_click=lambda e: (
-                                self._on_zoom_reset() if self._on_zoom_reset else None
-                            ),
-                        ),
-                    ],
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    spacing=4,
-                ),
-            ),
-            ft.PopupMenuItem(
                 content=ft.Text("Zoom In (+)"),
                 on_click=lambda e: self._on_zoom_in() if self._on_zoom_in else None,
             ),
