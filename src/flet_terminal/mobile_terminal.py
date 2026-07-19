@@ -43,6 +43,7 @@ class MobileTerminal(ft.Column):
             auto_focus=auto_focus,
             expand=True,
         )
+        self._default_font_size = font_size
 
         self._search_bar: TerminalSearchBar | None = None
         if show_search:
@@ -63,6 +64,19 @@ class MobileTerminal(ft.Column):
             self._terminal.on_modifier_reset = lambda e: (
                 self._keys_bar.reset_modifiers() if self._keys_bar else None
             )
+            self._keys_bar._on_zoom_in = self.zoom_in
+            self._keys_bar._on_zoom_out = self.zoom_out
+            self._keys_bar._on_zoom_reset = self.reset_zoom
+            self._keys_bar.current_font_size = font_size
+            self._keys_bar.default_font_size = font_size
+            self._keys_bar.active_cursor = cursor_style
+            self._keys_bar.active_blink = cursor_blink
+            self._keys_bar.active_search = show_search
+            if isinstance(theme, dict) and "name" in theme:
+                self._keys_bar.active_theme = theme["name"]
+            elif theme is None:
+                self._keys_bar.active_theme = "JetBrains Dark"
+            self._keys_bar.update_settings_menu()
 
         controls: list[ft.Control] = [self._terminal]
         if self._search_bar:
@@ -75,7 +89,11 @@ class MobileTerminal(ft.Column):
     def _on_modifier_change(self, ctrl: bool, alt: bool):
         self._terminal.ctrl_active = ctrl
         self._terminal.alt_active = alt
-        self._terminal.update()
+        try:
+            if self._terminal.page:
+                self._terminal.update()
+        except RuntimeError:
+            pass
 
     @property
     def show_search(self) -> bool:
@@ -93,28 +111,100 @@ class MobileTerminal(ft.Column):
                 self.controls.append(self._search_bar)
         if self._search_bar:
             self._search_bar.visible = val
-            self.update()
+            if self._keys_bar:
+                self._keys_bar.active_search = val
+                self._keys_bar.update_settings_menu()
+            try:
+                if self.page:
+                    self.update()
+            except RuntimeError:
+                pass
 
     def toggle_search(self):
         """Toggle visibility of the search bar."""
         self.show_search = not self.show_search
+        if self._keys_bar:
+            self._keys_bar.active_search = self.show_search
+            self._keys_bar.update_settings_menu()
 
     def set_theme(self, theme_name: str):
         """Switch the active terminal color theme by name."""
         preset = get_theme(theme_name)
         if preset:
             self._terminal.theme = preset
-            self._terminal.update()
+            try:
+                if self._terminal.page:
+                    self._terminal.update()
+            except RuntimeError:
+                pass
+            if self._keys_bar:
+                self._keys_bar.active_theme = theme_name
+                self._keys_bar.update_settings_menu()
 
     def set_cursor_style(self, style: str):
         """Set cursor shape ('block', 'underline', 'bar')."""
         self._terminal.cursor_style = style
-        self._terminal.update()
+        try:
+            if self._terminal.page:
+                self._terminal.update()
+        except RuntimeError:
+            pass
+        if self._keys_bar:
+            self._keys_bar.active_cursor = style
+            self._keys_bar.update_settings_menu()
 
     def toggle_cursor_blink(self):
         """Toggle blinking animation for the cursor."""
         self._terminal.cursor_blink = not self._terminal.cursor_blink
-        self._terminal.update()
+        try:
+            if self._terminal.page:
+                self._terminal.update()
+        except RuntimeError:
+            pass
+        if self._keys_bar:
+            self._keys_bar.active_blink = self._terminal.cursor_blink
+            self._keys_bar.update_settings_menu()
+
+    def zoom_in(self, step: float = 1.0):
+        """Increase terminal font size."""
+        current = self._terminal.font_size or 13.0
+        new_size = current + step
+        self._terminal.font_size = new_size
+        try:
+            if self._terminal.page:
+                self._terminal.update()
+        except RuntimeError:
+            pass
+        if self._keys_bar:
+            self._keys_bar.current_font_size = new_size
+            self._keys_bar.update_settings_menu()
+
+    def zoom_out(self, step: float = 1.0):
+        """Decrease terminal font size (minimum 6.0px)."""
+        current = self._terminal.font_size or 13.0
+        if current > 6.0:
+            new_size = max(6.0, current - step)
+            self._terminal.font_size = new_size
+            try:
+                if self._terminal.page:
+                    self._terminal.update()
+            except RuntimeError:
+                pass
+            if self._keys_bar:
+                self._keys_bar.current_font_size = new_size
+                self._keys_bar.update_settings_menu()
+
+    def reset_zoom(self):
+        """Reset terminal font size to original default."""
+        self._terminal.font_size = self._default_font_size
+        try:
+            if self._terminal.page:
+                self._terminal.update()
+        except RuntimeError:
+            pass
+        if self._keys_bar:
+            self._keys_bar.current_font_size = self._default_font_size
+            self._keys_bar.update_settings_menu()
 
     # ─── Forwarded Terminal Methods & Properties ───────────────────────────
 

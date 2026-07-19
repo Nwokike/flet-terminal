@@ -11,7 +11,7 @@ dependencies = [
 
 [tool.flet]
 org = "ng.kiri"
-product = "Terminal Demo"
+product = "Flet Terminal"
 build_number = 1
 
 [tool.flet.app]

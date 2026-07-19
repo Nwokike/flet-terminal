@@ -58,6 +58,16 @@ class ExtraKeysBar(ft.Container):
         self.alt_active = False
         self._collapsed = False
 
+        self.active_theme = "JetBrains Dark"
+        self.active_cursor = "block"
+        self.active_blink = True
+        self.active_search = True
+        self.current_font_size = 13.0
+        self.default_font_size = 13.0
+        self._on_zoom_in: Callable[[], None] | None = None
+        self._on_zoom_out: Callable[[], None] | None = None
+        self._on_zoom_reset: Callable[[], None] | None = None
+
         self._btn_ctrl: ft.Button | None = None
         self._btn_alt: ft.Button | None = None
 
@@ -112,79 +122,167 @@ class ExtraKeysBar(ft.Container):
             bgcolor="#181825",
         )
 
+    def _get_settings_menu_items(self) -> list[ft.Control]:
+        """Return the refreshed list of items with current checkmarks and font size."""
+        return [
+            ft.PopupMenuItem(
+                content=ft.Text("Theme Presets", weight=ft.FontWeight.BOLD),
+                disabled=True,
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Dracula"),
+                checked=self.active_theme == "Dracula",
+                on_click=lambda e: (
+                    self._on_set_theme("Dracula") if self._on_set_theme else None
+                ),
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("JetBrains Dark"),
+                checked=self.active_theme == "JetBrains Dark",
+                on_click=lambda e: (
+                    self._on_set_theme("JetBrains Dark") if self._on_set_theme else None
+                ),
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Matrix Green"),
+                checked=self.active_theme == "Matrix Green",
+                on_click=lambda e: (
+                    self._on_set_theme("Matrix Green") if self._on_set_theme else None
+                ),
+            ),
+            ft.PopupMenuItem(),
+            ft.PopupMenuItem(
+                content=ft.Text("Cursor Style", weight=ft.FontWeight.BOLD),
+                disabled=True,
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Block"),
+                checked=self.active_cursor == "block",
+                on_click=lambda e: (
+                    self._on_set_cursor("block") if self._on_set_cursor else None
+                ),
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Underline"),
+                checked=self.active_cursor == "underline",
+                on_click=lambda e: (
+                    self._on_set_cursor("underline") if self._on_set_cursor else None
+                ),
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Bar"),
+                checked=self.active_cursor == "bar",
+                on_click=lambda e: (
+                    self._on_set_cursor("bar") if self._on_set_cursor else None
+                ),
+            ),
+            ft.PopupMenuItem(),
+            ft.PopupMenuItem(
+                content=ft.Text("Font Size / Zoom", weight=ft.FontWeight.BOLD),
+                disabled=True,
+            ),
+            ft.PopupMenuItem(
+                content=ft.Row(
+                    controls=[
+                        ft.Text(
+                            f"Font Size: {int(self.current_font_size)}px",
+                            expand=True,
+                            weight=ft.FontWeight.W_600,
+                        ),
+                        ft.IconButton(
+                            icon=ft.Icons.REMOVE_CIRCLE_OUTLINE,
+                            icon_size=18,
+                            tooltip="Zoom Out",
+                            style=ft.ButtonStyle(
+                                padding=0, visual_density=ft.VisualDensity.COMPACT
+                            ),
+                            on_click=lambda e: (
+                                self._on_zoom_out() if self._on_zoom_out else None
+                            ),
+                        ),
+                        ft.IconButton(
+                            icon=ft.Icons.ADD_CIRCLE_OUTLINE,
+                            icon_size=18,
+                            tooltip="Zoom In",
+                            style=ft.ButtonStyle(
+                                padding=0, visual_density=ft.VisualDensity.COMPACT
+                            ),
+                            on_click=lambda e: (
+                                self._on_zoom_in() if self._on_zoom_in else None
+                            ),
+                        ),
+                        ft.IconButton(
+                            icon=ft.Icons.RESTART_ALT,
+                            icon_size=18,
+                            tooltip="Reset Zoom",
+                            style=ft.ButtonStyle(
+                                padding=0, visual_density=ft.VisualDensity.COMPACT
+                            ),
+                            on_click=lambda e: (
+                                self._on_zoom_reset() if self._on_zoom_reset else None
+                            ),
+                        ),
+                    ],
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=4,
+                ),
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Zoom In (+)"),
+                on_click=lambda e: self._on_zoom_in() if self._on_zoom_in else None,
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Zoom Out (-)"),
+                on_click=lambda e: self._on_zoom_out() if self._on_zoom_out else None,
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text(f"Reset Zoom ({int(self.default_font_size)}px)"),
+                on_click=lambda e: (
+                    self._on_zoom_reset() if self._on_zoom_reset else None
+                ),
+            ),
+            ft.PopupMenuItem(),
+            ft.PopupMenuItem(
+                content=ft.Text("Toggle Options", weight=ft.FontWeight.BOLD),
+                disabled=True,
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Cursor Blink"),
+                checked=self.active_blink,
+                on_click=lambda e: (
+                    self._on_toggle_blink() if self._on_toggle_blink else None
+                ),
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Search Bar"),
+                checked=self.active_search,
+                on_click=lambda e: (
+                    self._on_toggle_search() if self._on_toggle_search else None
+                ),
+            ),
+        ]
+
     def _build_settings_menu(self) -> ft.PopupMenuButton:
-        return ft.PopupMenuButton(
+        self._settings_menu = ft.PopupMenuButton(
             icon=ft.Icons.SETTINGS,
             icon_size=16,
             tooltip="Terminal Settings",
             style=ft.ButtonStyle(padding=2, visual_density=ft.VisualDensity.COMPACT),
-            items=[
-                ft.PopupMenuItem(
-                    content=ft.Text("Theme Presets", weight=ft.FontWeight.BOLD),
-                    disabled=True,
-                ),
-                ft.PopupMenuItem(
-                    content=ft.Text("Dracula"),
-                    on_click=lambda e: (
-                        self._on_set_theme("Dracula") if self._on_set_theme else None
-                    ),
-                ),
-                ft.PopupMenuItem(
-                    content=ft.Text("JetBrains Dark"),
-                    on_click=lambda e: (
-                        self._on_set_theme("JetBrains Dark")
-                        if self._on_set_theme
-                        else None
-                    ),
-                ),
-                ft.PopupMenuItem(
-                    content=ft.Text("Matrix Green"),
-                    on_click=lambda e: (
-                        self._on_set_theme("Matrix Green")
-                        if self._on_set_theme
-                        else None
-                    ),
-                ),
-                ft.PopupMenuItem(),
-                ft.PopupMenuItem(
-                    content=ft.Text("Cursor Style", weight=ft.FontWeight.BOLD),
-                    disabled=True,
-                ),
-                ft.PopupMenuItem(
-                    content=ft.Text("Block"),
-                    on_click=lambda e: (
-                        self._on_set_cursor("block") if self._on_set_cursor else None
-                    ),
-                ),
-                ft.PopupMenuItem(
-                    content=ft.Text("Underline"),
-                    on_click=lambda e: (
-                        self._on_set_cursor("underline")
-                        if self._on_set_cursor
-                        else None
-                    ),
-                ),
-                ft.PopupMenuItem(
-                    content=ft.Text("Bar"),
-                    on_click=lambda e: (
-                        self._on_set_cursor("bar") if self._on_set_cursor else None
-                    ),
-                ),
-                ft.PopupMenuItem(),
-                ft.PopupMenuItem(
-                    content=ft.Text("Toggle Cursor Blink"),
-                    on_click=lambda e: (
-                        self._on_toggle_blink() if self._on_toggle_blink else None
-                    ),
-                ),
-                ft.PopupMenuItem(
-                    content=ft.Text("Toggle Search Bar"),
-                    on_click=lambda e: (
-                        self._on_toggle_search() if self._on_toggle_search else None
-                    ),
-                ),
-            ],
+            items=self._get_settings_menu_items(),
         )
+        return self._settings_menu
+
+    def update_settings_menu(self):
+        """Refresh the items and checkmarks inside the settings menu."""
+        if hasattr(self, "_settings_menu") and self._settings_menu:
+            self._settings_menu.items = self._get_settings_menu_items()
+            try:
+                if self._settings_menu.page:
+                    self._settings_menu.update()
+                elif self.page:
+                    self.update()
+            except RuntimeError:
+                pass
 
     def _make_key_btn(self, label: str, payload: bytes | None) -> ft.Control:
         if payload is None:

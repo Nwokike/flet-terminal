@@ -127,8 +127,16 @@ class Terminal(ft.LayoutControl):
                 pass
 
     async def write_async(self, data: str | bytes):
-        """Writes text or escape sequences to the terminal via Flet method invocation."""
+        """Writes text or escape sequences to the terminal via DataChannel (fast path) or Flet method invocation."""
         try:
+            if self._channel is not None and self._channel_ready and self._dart_ready:
+                payload = (
+                    data.encode("utf-8", errors="ignore")
+                    if isinstance(data, str)
+                    else data
+                )
+                self._channel.send(payload)
+                return
             if not self.page or not self._dart_ready:
                 with self._lock:
                     self._pending_writes.append((self.write_async, (data,)))
@@ -147,8 +155,16 @@ class Terminal(ft.LayoutControl):
                 self._pending_writes.append((self.write_async, (data,)))
 
     def write(self, data: str | bytes):
-        """Synchronous wrapper for write_async."""
+        """Synchronous wrapper for write_async, routing to DataChannel when available."""
         try:
+            if self._channel is not None and self._channel_ready and self._dart_ready:
+                payload = (
+                    data.encode("utf-8", errors="ignore")
+                    if isinstance(data, str)
+                    else data
+                )
+                self._channel.send(payload)
+                return
             if not self.page or not self._dart_ready:
                 with self._lock:
                     self._pending_writes.append((self.write_async, (data,)))

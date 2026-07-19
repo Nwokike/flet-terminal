@@ -1,4 +1,4 @@
-"""Root FletTerminal Demo Application setup and lifecycle manager."""
+"""Root Flet Terminal Application setup and lifecycle manager."""
 # ruff: noqa: E402
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from ui_helpers import build_demo_appbar
 
 
 def main(page: ft.Page):
-    page.title = "FletTerminal Demo"
+    page.title = "Flet Terminal"
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 0
     page.bgcolor = "#12121A"
