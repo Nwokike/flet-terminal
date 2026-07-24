@@ -267,7 +267,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
 
   qt.TerminalStyle _parseStyle() {
     final fontFamily = widget.control.getString("font_family", "JetBrains Mono")!;
-    final fontSize = widget.control.getDouble("font_size", 13.0)!;
+    final fontSize = widget.control.getDouble("font_size", 11.0)!;
     return qt.TerminalStyle(
       fontFamily: fontFamily,
       fontSize: fontSize,

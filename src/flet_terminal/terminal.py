@@ -16,7 +16,7 @@ class Terminal(ft.LayoutControl):
 
     scrollback: Optional[int] = 10000
     font_family: Optional[str] = "JetBrains Mono"
-    font_size: Optional[float] = 13.0
+    font_size: Optional[float] = 11.0
     cursor_blink: Optional[bool] = True
     cursor_style: Optional[str] = "block"  # "block", "underline", "bar"
     theme: Optional[dict[str, Any]] = None

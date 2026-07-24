@@ -1,3 +1,10 @@
+# 0.2.2
+
+- Updated default font size from 13px to 11px.
+- Re-ordered virtual extra keys so arrow keys (`↑`, `↓`, `←`, `→`) come immediately after `ALT`.
+- Hidden search bar by default (`show_search=False`), toggleable via settings menu.
+- Intuitive collapse toggle button arrow states (`ARROW_DROP_UP` when open, `ARROW_DROP_DOWN` when collapsed).
+
 # 0.2.1
 
 - `Terminal.write()` and `write_async()` automatically route over the binary `DataChannel` (`pty`) fast-path whenever available, providing zero-latency output streaming for all applications.

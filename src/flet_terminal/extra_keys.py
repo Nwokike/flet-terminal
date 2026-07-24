@@ -20,15 +20,15 @@ DEFAULT_EXTRA_KEYS: list[tuple[str, bytes | None]] = [
     ("TAB", b"\t"),
     ("CTRL", None),
     ("ALT", None),
+    ("↑", b"\x1b[A"),
+    ("↓", b"\x1b[B"),
+    ("←", b"\x1b[D"),
+    ("→", b"\x1b[C"),
     ("-", b"-"),
     ("/", b"/"),
     ("|", b"|"),
     ("~", b"~"),
     ("^", b"^"),
-    ("↑", b"\x1b[A"),
-    ("↓", b"\x1b[B"),
-    ("←", b"\x1b[D"),
-    ("→", b"\x1b[C"),
 ]
 
 
@@ -62,8 +62,8 @@ class ExtraKeysBar(ft.Container):
         self.active_cursor = "block"
         self.active_blink = True
         self.active_search = True
-        self.current_font_size = 13.0
-        self.default_font_size = 13.0
+        self.current_font_size = 11.0
+        self.default_font_size = 11.0
         self._on_zoom_in: Callable[[], None] | None = None
         self._on_zoom_out: Callable[[], None] | None = None
         self._on_zoom_reset: Callable[[], None] | None = None
@@ -72,7 +72,7 @@ class ExtraKeysBar(ft.Container):
         self._btn_alt: ft.Button | None = None
 
         self._toggle_btn = ft.IconButton(
-            icon=ft.Icons.ARROW_DROP_DOWN,
+            icon=ft.Icons.ARROW_DROP_UP,
             icon_size=20,
             tooltip="Hide keys",
             style=ft.ButtonStyle(padding=2, visual_density=ft.VisualDensity.COMPACT),
@@ -326,11 +326,11 @@ class ExtraKeysBar(ft.Container):
     def _on_toggle_collapse(self, e):
         self._collapsed = not self._collapsed
         if self._collapsed:
-            self._toggle_btn.icon = ft.Icons.ARROW_DROP_UP
+            self._toggle_btn.icon = ft.Icons.ARROW_DROP_DOWN
             self._toggle_btn.tooltip = "Show keys"
             self.content = self._collapsed_view
         else:
-            self._toggle_btn.icon = ft.Icons.ARROW_DROP_DOWN
+            self._toggle_btn.icon = ft.Icons.ARROW_DROP_UP
             self._toggle_btn.tooltip = "Hide keys"
             self.content = self._expanded_row
         self.update()

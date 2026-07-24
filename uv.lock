@@ -55,7 +55,7 @@ wheels = [
 
 [[package]]
 name = "flet-terminal"
-version = "0.2.1"
+version = "0.2.2"
 source = { editable = "." }
 dependencies = [
     { name = "flet" },
@@ -67,7 +67,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "flet", specifier = ">=0.86.0" }]
+requires-dist = [{ name = "flet", specifier = ">=0.85.3" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "ruff", specifier = ">=0.15.22" }]

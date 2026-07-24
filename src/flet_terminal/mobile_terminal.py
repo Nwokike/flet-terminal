@@ -17,11 +17,11 @@ class MobileTerminal(ft.Column):
     def __init__(
         self,
         show_extra_keys: bool = True,
-        show_search: bool = True,
+        show_search: bool = False,
         show_settings: bool = True,
         scrollback: int = 10000,
         font_family: str = "JetBrains Mono",
-        font_size: float = 13.0,
+        font_size: float = 11.0,
         cursor_blink: bool = True,
         cursor_style: str = "block",
         theme: dict[str, Any] | None = None,
@@ -48,6 +48,7 @@ class MobileTerminal(ft.Column):
         self._search_bar: TerminalSearchBar | None = None
         if show_search:
             self._search_bar = TerminalSearchBar(on_search=self._terminal.search)
+            self._search_bar.visible = True
 
         self._keys_bar: ExtraKeysBar | None = None
         if show_extra_keys:
@@ -167,7 +168,7 @@ class MobileTerminal(ft.Column):
 
     def zoom_in(self, step: float = 1.0):
         """Increase terminal font size."""
-        current = self._terminal.font_size or 13.0
+        current = self._terminal.font_size or 11.0
         new_size = current + step
         self._terminal.font_size = new_size
         try:
@@ -181,7 +182,7 @@ class MobileTerminal(ft.Column):
 
     def zoom_out(self, step: float = 1.0):
         """Decrease terminal font size (minimum 6.0px)."""
-        current = self._terminal.font_size or 13.0
+        current = self._terminal.font_size or 11.0
         if current > 6.0:
             new_size = max(6.0, current - step)
             self._terminal.font_size = new_size

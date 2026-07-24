@@ -30,7 +30,6 @@ def main(page: ft.Page):
         show_settings=True,
         scrollback=10000,
         font_family="JetBrains Mono",
-        font_size=13.0,
         cursor_style="block",
         cursor_blink=True,
         theme=BUILTIN_THEMES["JetBrains Dark"],

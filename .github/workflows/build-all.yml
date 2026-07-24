@@ -8,7 +8,7 @@ on:
       build_version:
         description: "Build version"
         required: true
-        default: "0.2.1"
+        default: "0.2.2"
       build_number:
         description: "Build number"
         required: true
@@ -21,7 +21,7 @@ env:
   PYTHONUTF8: "1"
   FLET_CLI_NO_RICH_OUTPUT: "1"
   UV_PYTHON: "3.12"
-  BUILD_VERSION: ${{ inputs.build_version || '0.2.1' }}
+  BUILD_VERSION: ${{ inputs.build_version || '0.2.2' }}
   BUILD_NUMBER: ${{ inputs.build_number || '1' }}
 
 jobs:
