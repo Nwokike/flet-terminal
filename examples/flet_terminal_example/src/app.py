@@ -69,8 +69,9 @@ def _make_bundle(page: ft.Page):
 @ft.component
 def App() -> ft.Control:
     page = ft.context.page
-    ds = ft.use_state(DemoState).value
-    mt, pty = ft.use_state(lambda: _make_bundle(page)).value
+    ds, _ = ft.use_state(DemoState)
+    bundle, _ = ft.use_state(lambda: _make_bundle(page))
+    mt, pty = bundle
 
     def switch_engine(engine_name: str):
         mt.clear()
@@ -131,9 +132,7 @@ def App() -> ft.Control:
         on_run_alt_screen=run_alt_screen,
     )
 
-    return ft.SafeArea(
-        content=ft.Column(controls=[appbar, mt], spacing=0, expand=True)
-    )
+    return ft.SafeArea(content=ft.Column(controls=[appbar, mt], spacing=0, expand=True))
 
 
 __all__ = ["App", "DemoState"]

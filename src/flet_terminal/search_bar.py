@@ -43,9 +43,7 @@ class TerminalSearchBar(ft.Container):
         )
         self._counter.visible = False
 
-        btn_style = ft.ButtonStyle(
-            padding=2, visual_density=ft.VisualDensity.COMPACT
-        )
+        btn_style = ft.ButtonStyle(padding=2, visual_density=ft.VisualDensity.COMPACT)
         prev_btn = ft.IconButton(
             icon=ft.Icons.KEYBOARD_ARROW_UP_ROUNDED,
             icon_size=14,

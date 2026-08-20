@@ -1,6 +1,6 @@
 name: flet_terminal
 description: Flet native Terminal control using xterm.dart
-version: 0.3.0
+version: 0.3.1
 publish_to: none
 
 environment:

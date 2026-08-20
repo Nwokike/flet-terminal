@@ -3,6 +3,7 @@
 The app is a single `@ft.component` tree rendered via `page.render(App)`;
 all UI state lives in the `DemoState` observable in `app.py`.
 """
+# ruff: noqa: E402
 
 from __future__ import annotations
 
