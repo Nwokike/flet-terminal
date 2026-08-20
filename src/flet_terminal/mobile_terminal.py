@@ -141,9 +141,7 @@ class MobileTerminal(ft.Column):
                 on_close=lambda: self.toggle_search(),
             )
             with thaw(self._terminal):
-                self._terminal.on_selection_change = (
-                    self._internal_on_selection_change
-                )
+                self._terminal.on_selection_change = self._internal_on_selection_change
             if self._keys_bar and self._keys_bar in self.controls:
                 self.controls.insert(
                     self.controls.index(self._keys_bar), self._search_bar
@@ -402,9 +400,7 @@ class MobileTerminal(ft.Column):
         self._user_on_selection_change = val
         with thaw(self._terminal):
             if self._search_bar is not None:
-                self._terminal.on_selection_change = (
-                    self._internal_on_selection_change
-                )
+                self._terminal.on_selection_change = self._internal_on_selection_change
             else:
                 self._terminal.on_selection_change = val
 
