@@ -140,7 +140,10 @@ class MobileTerminal(ft.Column):
                 on_search=self._terminal.search,
                 on_close=lambda: self.toggle_search(),
             )
-            self._terminal.on_selection_change = self._internal_on_selection_change
+            with thaw(self._terminal):
+                self._terminal.on_selection_change = (
+                    self._internal_on_selection_change
+                )
             if self._keys_bar and self._keys_bar in self.controls:
                 self.controls.insert(
                     self.controls.index(self._keys_bar), self._search_bar
@@ -350,14 +353,16 @@ class MobileTerminal(ft.Column):
     def set_on_bytes(self, handler: Callable[[bytes], None]):
         self._terminal.set_on_bytes(handler)
 
-    # Forwarded event handler accessors
+    # Forwarded event handler accessors — handler assignment is a Prop write,
+    # so each setter thaws the (possibly declarative-frozen) terminal first.
     @property
     def on_data(self):
         return self._terminal.on_data
 
     @on_data.setter
     def on_data(self, val):
-        self._terminal.on_data = val
+        with thaw(self._terminal):
+            self._terminal.on_data = val
 
     @property
     def on_resize(self):
@@ -365,7 +370,8 @@ class MobileTerminal(ft.Column):
 
     @on_resize.setter
     def on_resize(self, val):
-        self._terminal.on_resize = val
+        with thaw(self._terminal):
+            self._terminal.on_resize = val
 
     @property
     def on_title_change(self):
@@ -373,7 +379,8 @@ class MobileTerminal(ft.Column):
 
     @on_title_change.setter
     def on_title_change(self, val):
-        self._terminal.on_title_change = val
+        with thaw(self._terminal):
+            self._terminal.on_title_change = val
 
     @property
     def on_bell(self):
@@ -381,7 +388,8 @@ class MobileTerminal(ft.Column):
 
     @on_bell.setter
     def on_bell(self, val):
-        self._terminal.on_bell = val
+        with thaw(self._terminal):
+            self._terminal.on_bell = val
 
     @property
     def on_selection_change(self):
@@ -392,10 +400,13 @@ class MobileTerminal(ft.Column):
         # Keep the internal router (search counter) installed; the user
         # handler is invoked from it.
         self._user_on_selection_change = val
-        if self._search_bar is not None:
-            self._terminal.on_selection_change = self._internal_on_selection_change
-        else:
-            self._terminal.on_selection_change = val
+        with thaw(self._terminal):
+            if self._search_bar is not None:
+                self._terminal.on_selection_change = (
+                    self._internal_on_selection_change
+                )
+            else:
+                self._terminal.on_selection_change = val
 
     @property
     def on_copy(self):
@@ -403,4 +414,5 @@ class MobileTerminal(ft.Column):
 
     @on_copy.setter
     def on_copy(self, val):
-        self._terminal.on_copy = val
+        with thaw(self._terminal):
+            self._terminal.on_copy = val
