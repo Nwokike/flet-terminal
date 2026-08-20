@@ -288,6 +288,30 @@ class MobileTerminal(ft.Column):
     def send_bytes(self, payload: bytes):
         self._terminal.send_bytes(payload)
 
+    @property
+    def font_size(self) -> float:
+        """The terminal's current font size (default 11.0)."""
+        return self._terminal.font_size or self._default_font_size
+
+    @property
+    def cursor_blink(self) -> bool:
+        """Whether cursor blinking is enabled."""
+        return bool(self._terminal.cursor_blink)
+
+    @property
+    def cursor_style(self) -> str:
+        """The active cursor shape ('block', 'underline', 'bar')."""
+        return self._terminal.cursor_style or "block"
+
+    @property
+    def theme_name(self) -> str | None:
+        """Name of the active built-in theme, if any matches."""
+        cur = self._terminal.theme or {}
+        for name, preset in BUILTIN_THEMES.items():
+            if all(cur.get(k) == v for k, v in preset.items()):
+                return name
+        return None
+
     def send_input(self, payload: bytes):
         self._terminal.send_input(payload)
 
