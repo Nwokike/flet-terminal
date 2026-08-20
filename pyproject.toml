@@ -1,6 +1,6 @@
 [project]
 name = "flet-terminal"
-version = "0.3.5"
+version = "0.3.6"
 description = "Native GPU-accelerated Terminal control for Flet using xterm.dart"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import flet as ft
 
@@ -18,6 +19,50 @@ from .tokens import (
 )
 
 __all__ = ["DEFAULT_EXTRA_KEYS", "ExtraKeysBar"]
+
+
+# Reactive modifier state. Flet 0.86's declarative model only repaints a control
+# when its owning @ft.component re-renders (it diffs the previous render tree
+# against the new one). Mutating `style` + `update()` is a no-op there, so the
+# CTRL/ALT "light" is driven by this observable: the buttons subscribe to it and
+# re-render whenever a flag flips.
+@ft.observable
+@dataclass
+class ModifierState:
+    """Sticky CTRL/ALT state shared between ExtraKeysBar logic and the buttons."""
+
+    ctrl: bool = False
+    alt: bool = False
+
+
+def _modifier_style(active: bool) -> ft.ButtonStyle:
+    return ft.ButtonStyle(
+        padding=ft.Padding.symmetric(horizontal=6, vertical=0),
+        bgcolor=COLOR_ACTIVE_BG if active else COLOR_INACTIVE_BG,
+        color=COLOR_ACTIVE_FG if active else COLOR_INACTIVE_FG,
+        visual_density=ft.VisualDensity.COMPACT,
+        side=ft.BorderSide(width=0),
+    )
+
+
+@ft.component
+def ModifierKey(state: ModifierState, label: str, on_toggle: Callable[[], None]):
+    """A single CTRL/ALT toggle rendered reactively from `state`.
+
+    Subscribing to `state` via `use_state` makes this component re-render (and
+    repaint the button) the moment `state.ctrl`/`state.alt` changes — whether
+    the change came from a tap here or from `reset_modifiers()` on the bar.
+    """
+    st, _ = ft.use_state(state)
+    which = label.lower()
+    active = getattr(st, which)
+    return ft.Button(
+        content=ft.Text(label, size=BTN_FONT_SIZE, weight=ft.FontWeight.BOLD),
+        height=BTN_HEIGHT,
+        style=_modifier_style(active),
+        on_click=lambda e: on_toggle(),
+    )
+
 
 DEFAULT_EXTRA_KEYS: list[tuple[str, bytes | None]] = [
     ("ESC", b"\x1b"),
@@ -66,8 +111,7 @@ class ExtraKeysBar(ft.Container):
         self._on_clear = on_clear
         self._keys = keys or DEFAULT_EXTRA_KEYS
 
-        self.ctrl_active = False
-        self.alt_active = False
+        self._mods = ModifierState()
         self._collapsed = False
 
         self.active_theme = "JetBrains Dark"
@@ -133,6 +177,25 @@ class ExtraKeysBar(ft.Container):
             padding=ft.Padding(4, 1, 4, 1),
             bgcolor="#181825",
         )
+
+    # Backwards-compatible accessors. MobileTerminal assigns these (e.g. from
+    # the Dart `modifier_reset` event); routing them through the observable
+    # keeps the on-screen buttons in sync via their reactive subscription.
+    @property
+    def ctrl_active(self) -> bool:
+        return self._mods.ctrl
+
+    @ctrl_active.setter
+    def ctrl_active(self, value: bool):
+        self._mods.ctrl = bool(value)
+
+    @property
+    def alt_active(self) -> bool:
+        return self._mods.alt
+
+    @alt_active.setter
+    def alt_active(self, value: bool):
+        self._mods.alt = bool(value)
 
     def _get_settings_menu_items(self) -> list[ft.Control]:
         """Return the refreshed list of items with current checkmarks and font size."""
@@ -264,13 +327,10 @@ class ExtraKeysBar(ft.Container):
     def _make_key_btn(self, label: str, payload: bytes | None) -> ft.Control:
         if payload is None:
             is_ctrl = label == "CTRL"
-            btn = ft.Button(
-                content=ft.Text(label, size=BTN_FONT_SIZE, weight=ft.FontWeight.BOLD),
-                height=BTN_HEIGHT,
-                style=self._get_modifier_style(
-                    self.ctrl_active if is_ctrl else self.alt_active
-                ),
-                on_click=lambda e, c=is_ctrl: self._toggle_modifier(c),
+            btn = ModifierKey(
+                self._mods,
+                label,
+                lambda: self._toggle_modifier(is_ctrl),
             )
             if is_ctrl:
                 self._btn_ctrl = btn
@@ -295,57 +355,34 @@ class ExtraKeysBar(ft.Container):
             on_click=lambda e, p=payload: self._send_payload(p),
         )
 
-    def _get_modifier_style(self, active: bool) -> ft.ButtonStyle:
-        return ft.ButtonStyle(
-            padding=ft.Padding.symmetric(horizontal=6, vertical=0),
-            bgcolor=COLOR_ACTIVE_BG if active else COLOR_INACTIVE_BG,
-            color=COLOR_ACTIVE_FG if active else COLOR_INACTIVE_FG,
-            visual_density=ft.VisualDensity.COMPACT,
-            side=ft.BorderSide(width=0),
-        )
-
     def _toggle_modifier(self, is_ctrl: bool):
         if is_ctrl:
-            self.ctrl_active = not self.ctrl_active
+            self._mods.ctrl = not self._mods.ctrl
         else:
-            self.alt_active = not self.alt_active
-        self.refresh_buttons()
-        self._on_modifier_change(self.ctrl_active, self.alt_active)
-
-    def refresh_buttons(self):
-        if self._btn_ctrl:
-            with thaw(self._btn_ctrl):
-                self._btn_ctrl.style = self._get_modifier_style(self.ctrl_active)
-                if self._btn_ctrl.page:
-                    self._btn_ctrl.update()
-        if self._btn_alt:
-            with thaw(self._btn_alt):
-                self._btn_alt.style = self._get_modifier_style(self.alt_active)
-                if self._btn_alt.page:
-                    self._btn_alt.update()
+            self._mods.alt = not self._mods.alt
+        # The button repaints via its reactive subscription to `self._mods`;
+        # no imperative style/update is needed (or even effective) here.
+        self._on_modifier_change(self._mods.ctrl, self._mods.alt)
 
     def reset_modifiers(self):
-        if self.ctrl_active or self.alt_active:
-            self.ctrl_active = False
-            self.alt_active = False
-            self.refresh_buttons()
-            self._on_modifier_change(self.ctrl_active, self.alt_active)
+        if self._mods.ctrl or self._mods.alt:
+            self._mods.ctrl = False
+            self._mods.alt = False
+            self._on_modifier_change(self._mods.ctrl, self._mods.alt)
 
     def _send_payload(self, payload: bytes):
-        if self.ctrl_active and len(payload) == 1:
+        if self._mods.ctrl and len(payload) == 1:
             code = payload[0]
             if 97 <= code <= 122:
                 payload = bytes([code - 96])
             elif 65 <= code <= 90:
                 payload = bytes([code - 64])
-            self.ctrl_active = False
-            self.refresh_buttons()
-            self._on_modifier_change(self.ctrl_active, self.alt_active)
-        if self.alt_active:
+            self._mods.ctrl = False
+            self._on_modifier_change(self._mods.ctrl, self._mods.alt)
+        if self._mods.alt:
             payload = b"\x1b" + payload
-            self.alt_active = False
-            self.refresh_buttons()
-            self._on_modifier_change(self.ctrl_active, self.alt_active)
+            self._mods.alt = False
+            self._on_modifier_change(self._mods.ctrl, self._mods.alt)
         self._on_send_payload(payload)
 
     def _on_toggle_collapse(self, e):
