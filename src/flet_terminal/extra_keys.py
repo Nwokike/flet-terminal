@@ -1,11 +1,14 @@
 """ExtraKeysBar — virtual accessory keyboard and settings toolbar for FletTerminal."""
 
 from __future__ import annotations
-from typing import Callable
+
+from collections.abc import Callable
+
 import flet as ft
+
 from .tokens import (
-    BTN_HEIGHT,
     BTN_FONT_SIZE,
+    BTN_HEIGHT,
     COLOR_ACTIVE_BG,
     COLOR_ACTIVE_FG,
     COLOR_INACTIVE_BG,
@@ -44,6 +47,10 @@ class ExtraKeysBar(ft.Container):
         on_set_cursor: Callable[[str], None] | None = None,
         on_toggle_blink: Callable[[], None] | None = None,
         on_toggle_search: Callable[[], None] | None = None,
+        on_copy: Callable[[], None] | None = None,
+        on_paste: Callable[[], None] | None = None,
+        on_select_all: Callable[[], None] | None = None,
+        on_clear: Callable[[], None] | None = None,
         keys: list[tuple[str, bytes | None]] | None = None,
     ):
         self._on_send_payload = on_send_payload
@@ -52,6 +59,10 @@ class ExtraKeysBar(ft.Container):
         self._on_set_cursor = on_set_cursor
         self._on_toggle_blink = on_toggle_blink
         self._on_toggle_search = on_toggle_search
+        self._on_copy = on_copy
+        self._on_paste = on_paste
+        self._on_select_all = on_select_all
+        self._on_clear = on_clear
         self._keys = keys or DEFAULT_EXTRA_KEYS
 
         self.ctrl_active = False
@@ -126,6 +137,33 @@ class ExtraKeysBar(ft.Container):
         """Return the refreshed list of items with current checkmarks and font size."""
         return [
             ft.PopupMenuItem(
+                content=ft.Text("Clipboard", weight=ft.FontWeight.BOLD),
+                disabled=True,
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Copy Selection"),
+                icon=ft.Icons.COPY_ROUNDED,
+                on_click=lambda e: self._on_copy() if self._on_copy else None,
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Paste"),
+                icon=ft.Icons.CONTENT_PASTE_ROUNDED,
+                on_click=lambda e: self._on_paste() if self._on_paste else None,
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Select All"),
+                icon=ft.Icons.SELECT_ALL_ROUNDED,
+                on_click=lambda e: (
+                    self._on_select_all() if self._on_select_all else None
+                ),
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Clear Terminal"),
+                icon=ft.Icons.CLEAR_ALL_ROUNDED,
+                on_click=lambda e: self._on_clear() if self._on_clear else None,
+            ),
+            ft.PopupMenuItem(),
+            ft.PopupMenuItem(
                 content=ft.Text("Theme Presets", weight=ft.FontWeight.BOLD),
                 disabled=True,
             ),
@@ -148,6 +186,13 @@ class ExtraKeysBar(ft.Container):
                 checked=self.active_theme == "Matrix Green",
                 on_click=lambda e: (
                     self._on_set_theme("Matrix Green") if self._on_set_theme else None
+                ),
+            ),
+            ft.PopupMenuItem(
+                content=ft.Text("Colab Light"),
+                checked=self.active_theme == "Colab Light",
+                on_click=lambda e: (
+                    self._on_set_theme("Colab Light") if self._on_set_theme else None
                 ),
             ),
             ft.PopupMenuItem(),

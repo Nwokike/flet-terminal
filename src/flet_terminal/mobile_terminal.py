@@ -46,9 +46,16 @@ class MobileTerminal(ft.Column):
         self._default_font_size = font_size
 
         self._search_bar: TerminalSearchBar | None = None
+        self._user_on_selection_change = None
         if show_search:
-            self._search_bar = TerminalSearchBar(on_search=self._terminal.search)
+            self._search_bar = TerminalSearchBar(
+                on_search=self._terminal.search,
+                on_close=lambda: self.toggle_search(),
+            )
             self._search_bar.visible = True
+            # Route search results into the bar's match counter while still
+            # forwarding the event to any user-supplied handler.
+            self._terminal.on_selection_change = self._internal_on_selection_change
 
         self._keys_bar: ExtraKeysBar | None = None
         if show_extra_keys:
@@ -60,6 +67,10 @@ class MobileTerminal(ft.Column):
                 on_set_cursor=self.set_cursor_style,
                 on_toggle_blink=self.toggle_cursor_blink,
                 on_toggle_search=self.toggle_search,
+                on_copy=self.copy_selection,
+                on_paste=self.paste,
+                on_select_all=self.select_all,
+                on_clear=self.clear,
                 keys=extra_keys or DEFAULT_EXTRA_KEYS,
             )
             self._terminal.on_modifier_reset = lambda e: (
@@ -87,6 +98,25 @@ class MobileTerminal(ft.Column):
 
         self.controls = controls
 
+    def _internal_on_selection_change(self, e):
+        """Routes selection_change events: feeds the search bar counter and
+        forwards to any user-supplied on_selection_change handler."""
+        import json
+
+        if self._search_bar:
+            try:
+                data = json.loads(e.data) if isinstance(e.data, str) else (e.data or {})
+                if "found" in data:  # search-originated event
+                    self._search_bar.report_result(
+                        bool(data.get("found")),
+                        int(data.get("count", 0)),
+                        int(data.get("index", -1)),
+                    )
+            except Exception:
+                pass
+        if self._user_on_selection_change:
+            self._user_on_selection_change(e)
+
     def _on_modifier_change(self, ctrl: bool, alt: bool):
         self._terminal.ctrl_active = ctrl
         self._terminal.alt_active = alt
@@ -103,7 +133,11 @@ class MobileTerminal(ft.Column):
     @show_search.setter
     def show_search(self, val: bool):
         if not self._search_bar and val:
-            self._search_bar = TerminalSearchBar(on_search=self._terminal.search)
+            self._search_bar = TerminalSearchBar(
+                on_search=self._terminal.search,
+                on_close=lambda: self.toggle_search(),
+            )
+            self._terminal.on_selection_change = self._internal_on_selection_change
             if self._keys_bar and self._keys_bar in self.controls:
                 self.controls.insert(
                     self.controls.index(self._keys_bar), self._search_bar
@@ -246,14 +280,53 @@ class MobileTerminal(ft.Column):
     def focus(self):
         self._terminal.focus()
 
-    def search(self, query: str, start: int = 0):
-        self._terminal.search(query, start)
+    def search(self, query: str, start: int = 0, direction: str = "next"):
+        self._terminal.search(query, start, direction)
 
     def clear_selection(self):
         self._terminal.clear_selection()
 
     def select_all(self):
         self._terminal.select_all()
+
+    async def get_selection_async(self) -> str | None:
+        return await self._terminal.get_selection_async()
+
+    async def copy_selection_async(self) -> bool:
+        """Copies the current selection to the system clipboard.
+
+        Returns True when text was copied. Fires the terminal's `on_copy`
+        handler (via the Dart right-click path this already happens; this is
+        the programmatic/mobile equivalent).
+        """
+        text = await self._terminal.get_selection_async()
+        if not text:
+            return False
+        try:
+            await ft.Clipboard().set(text)
+        except Exception:
+            return False
+        self._terminal.clear_selection()
+        try:
+            await self._terminal._trigger_event("copy", text)
+        except Exception:
+            pass
+        return True
+
+    def copy_selection(self):
+        """Synchronous wrapper for copy_selection_async."""
+        try:
+            if not self.page:
+                return
+            self.page.run_task(self.copy_selection_async)
+        except RuntimeError:
+            pass
+
+    async def paste_async(self):
+        await self._terminal.paste_async()
+
+    def paste(self):
+        self._terminal.paste()
 
     def set_on_bytes(self, handler: Callable[[bytes], None]):
         self._terminal.set_on_bytes(handler)
@@ -293,8 +366,22 @@ class MobileTerminal(ft.Column):
 
     @property
     def on_selection_change(self):
-        return self._terminal.on_selection_change
+        return self._user_on_selection_change
 
     @on_selection_change.setter
     def on_selection_change(self, val):
-        self._terminal.on_selection_change = val
+        # Keep the internal router (search counter) installed; the user
+        # handler is invoked from it.
+        self._user_on_selection_change = val
+        if self._search_bar is not None:
+            self._terminal.on_selection_change = self._internal_on_selection_change
+        else:
+            self._terminal.on_selection_change = val
+
+    @property
+    def on_copy(self):
+        return self._terminal.on_copy
+
+    @on_copy.setter
+    def on_copy(self, val):
+        self._terminal.on_copy = val

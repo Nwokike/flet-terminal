@@ -1,6 +1,7 @@
 """Built-in color schemes and themes for FletTerminal."""
 
 from __future__ import annotations
+
 from typing import Any
 
 __all__ = ["BUILTIN_THEMES", "get_theme"]
@@ -47,6 +48,20 @@ BUILTIN_THEMES: dict[str, dict[str, str]] = {
         "magenta": "#FF00FF",
         "cyan": "#00FFFF",
         "white": "#FFFFFF",
+    },
+    "Colab Light": {
+        "background": "#FFFFFF",
+        "foreground": "#1F2430",
+        "cursor": "#F97316",
+        "selection": "#D6E4F0",
+        "black": "#1F2430",
+        "red": "#D93025",
+        "green": "#188038",
+        "yellow": "#B26A00",
+        "blue": "#1A73E8",
+        "magenta": "#C2185B",
+        "cyan": "#00838F",
+        "white": "#E8EAED",
     },
 }
 

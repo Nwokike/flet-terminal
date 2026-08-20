@@ -34,6 +34,7 @@ class Terminal(ft.LayoutControl):
     on_title_change: Optional[ft.ControlEventHandler] = None
     on_bell: Optional[ft.ControlEventHandler] = None
     on_selection_change: Optional[ft.ControlEventHandler] = None
+    on_copy: Optional[ft.ControlEventHandler] = None
     on_mount: Optional[ft.ControlEventHandler] = None
 
     # Internal channel setup handler
@@ -232,39 +233,52 @@ class Terminal(ft.LayoutControl):
             with self._lock:
                 self._pending_writes.append((self.focus_async, None))
 
-    async def search_async(self, query: str, start: int = 0):
+    async def search_async(self, query: str, start: int = 0, direction: str = "next"):
         """Searches for text within the terminal scrollback ring buffer.
 
         `start` is the character offset to resume scanning from (used to step
-        through successive matches). The Dart side selects the match and
-        reports the total count via the `on_selection_change` event.
+        through successive matches). `direction` is "next" or "prev". The Dart
+        side selects the match and reports the total count via the
+        `on_selection_change` event.
         """
         try:
             if not self.page or not self._dart_ready:
                 with self._lock:
-                    self._pending_writes.append((self.search_async, (query, start)))
+                    self._pending_writes.append(
+                        (self.search_async, (query, start, direction))
+                    )
                 return
         except RuntimeError:
             with self._lock:
-                self._pending_writes.append((self.search_async, (query, start)))
+                self._pending_writes.append(
+                    (self.search_async, (query, start, direction))
+                )
             return
         try:
-            await self._invoke_method("search", {"query": query, "start": start})
+            await self._invoke_method(
+                "search", {"query": query, "start": start, "direction": direction}
+            )
         except RuntimeError:
             with self._lock:
-                self._pending_writes.append((self.search_async, (query, start)))
+                self._pending_writes.append(
+                    (self.search_async, (query, start, direction))
+                )
 
-    def search(self, query: str, start: int = 0):
+    def search(self, query: str, start: int = 0, direction: str = "next"):
         """Synchronous wrapper for search_async."""
         try:
             if not self.page or not self._dart_ready:
                 with self._lock:
-                    self._pending_writes.append((self.search_async, (query, start)))
+                    self._pending_writes.append(
+                        (self.search_async, (query, start, direction))
+                    )
                 return
-            self.page.run_task(self.search_async, query, start)
+            self.page.run_task(self.search_async, query, start, direction)
         except RuntimeError:
             with self._lock:
-                self._pending_writes.append((self.search_async, (query, start)))
+                self._pending_writes.append(
+                    (self.search_async, (query, start, direction))
+                )
 
     async def clear_selection_async(self):
         """Clears any active text selection in the terminal."""
@@ -323,3 +337,45 @@ class Terminal(ft.LayoutControl):
         except RuntimeError:
             with self._lock:
                 self._pending_writes.append((self.select_all_async, None))
+
+    async def get_selection_async(self) -> Optional[str]:
+        """Returns the currently selected text, or None when there is no
+        selection or the control is not ready. Unlike the fire-and-forget
+        methods above this is a request/response call, so it cannot be queued
+        — callers should retry after mount if they get None."""
+        try:
+            if not self.page or not self._dart_ready:
+                return None
+            result = await self._invoke_method("get_selection")
+            return result if result else None
+        except RuntimeError:
+            return None
+
+    async def paste_async(self):
+        """Reads the system clipboard on the Dart side and feeds it to the PTY."""
+        try:
+            if not self.page or not self._dart_ready:
+                with self._lock:
+                    self._pending_writes.append((self.paste_async, None))
+                return
+        except RuntimeError:
+            with self._lock:
+                self._pending_writes.append((self.paste_async, None))
+            return
+        try:
+            await self._invoke_method("paste")
+        except RuntimeError:
+            with self._lock:
+                self._pending_writes.append((self.paste_async, None))
+
+    def paste(self):
+        """Synchronous wrapper for paste_async."""
+        try:
+            if not self.page or not self._dart_ready:
+                with self._lock:
+                    self._pending_writes.append((self.paste_async, None))
+                return
+            self.page.run_task(self.paste_async)
+        except RuntimeError:
+            with self._lock:
+                self._pending_writes.append((self.paste_async, None))

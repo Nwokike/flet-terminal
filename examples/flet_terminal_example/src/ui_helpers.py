@@ -1,14 +1,16 @@
 """UI Helpers — constructs appbar, engine selector, demo actions, and top-level navigation."""
 
 from __future__ import annotations
-from typing import Any, Callable
+
+from collections.abc import Callable
+from typing import Any
+
 import flet as ft
 
 __all__ = ["build_demo_appbar"]
 
 
 def build_demo_appbar(
-    page: ft.Page,
     mt: Any,
     available_engines: list[str],
     active_engine: str,
@@ -73,14 +75,14 @@ def build_demo_appbar(
         icon_size=18,
         tooltip="Zoom In",
         style=ft.ButtonStyle(padding=2, visual_density=ft.VisualDensity.COMPACT),
-        on_click=lambda e: _change_font_size(page, mt, 1.0),
+        on_click=lambda e: mt.zoom_in(),
     )
     zoom_out_btn = ft.IconButton(
         icon=ft.Icons.ZOOM_OUT,
         icon_size=18,
         tooltip="Zoom Out",
         style=ft.ButtonStyle(padding=2, visual_density=ft.VisualDensity.COMPACT),
-        on_click=lambda e: _change_font_size(page, mt, -1.0),
+        on_click=lambda e: mt.zoom_out(),
     )
     toggle_search_btn = ft.IconButton(
         icon=ft.Icons.SEARCH,
@@ -99,9 +101,3 @@ def build_demo_appbar(
         actions=[demos_popup, toggle_search_btn, zoom_out_btn, zoom_in_btn],
         actions_padding=ft.Padding.only(right=8),
     )
-
-
-def _change_font_size(page: ft.Page, mt: Any, delta: float):
-    new_size = max(8.0, min(36.0, (mt._terminal.font_size or 13.0) + delta))
-    mt._terminal.font_size = new_size
-    mt._terminal.update()

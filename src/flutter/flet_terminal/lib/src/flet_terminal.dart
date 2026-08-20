@@ -35,6 +35,10 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     final maxLines = widget.control.getInt("scrollback", 10000)!;
     _terminal = qt.Terminal(maxLines: maxLines);
 
+    // Surface real user selections (long-press word select, drag select) to
+    // Python. Previously selection_change only fired from the search method.
+    _terminalController.addListener(_onSelectionChanged);
+
     // Setup input forwarding from terminal to Python with sticky modifiers support
     _terminal.onOutput = (String output) {
       bool ctrl = widget.control.getBool("ctrl_active", false)!;
@@ -121,6 +125,18 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     }
   }
 
+  void _onSelectionChanged() {
+    final selection = _terminalController.selection;
+    final hasSelection = selection != null;
+    widget.control.triggerEvent(
+      "selection_change",
+      jsonEncode({
+        "has_selection": hasSelection,
+        "text": hasSelection ? _terminal.buffer.getText(selection) : "",
+      }),
+    );
+  }
+
   Future<dynamic> _handleMethodCall(String name, dynamic args) async {
     if (name == "write") {
       if (mounted) {
@@ -135,6 +151,19 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
       _focusNode.requestFocus();
     } else if (name == "clear_selection") {
       _terminalController.clearSelection();
+    } else if (name == "get_selection") {
+      final selection = _terminalController.selection;
+      if (selection == null) return "";
+      return _terminal.buffer.getText(selection);
+    } else if (name == "paste") {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      if (data != null && data.text != null && data.text!.isNotEmpty) {
+        if (_channelSub != null && _channel != null) {
+          _channel!.send(Uint8List.fromList(utf8.encode(data.text!)));
+        } else {
+          widget.control.triggerEvent("data", data.text!);
+        }
+      }
     } else if (name == "select_all") {
       if (mounted) {
         _terminalController.setSelection(
@@ -152,6 +181,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     } else if (name == "search") {
       final query = args["query"] as String?;
       final start = (args["start"] as int? ?? 0);
+      final direction = (args["direction"] as String? ?? "next");
       if (query != null && query.isNotEmpty && mounted) {
         final fullText = _terminal.buffer.getText();
         final lower = fullText.toLowerCase();
@@ -168,9 +198,43 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
           }
         }
 
-        // Find the next match at or after `start` (wraps to first).
-        int index = lower.indexOf(needle, start);
-        if (index == -1) index = lower.indexOf(needle);
+        // Locate the match to highlight. "next" finds the first match at or
+        // after `start` (wrapping to the first); "prev" finds the last match
+        // strictly before `start` (wrapping to the last).
+        int index = -1;
+        if (direction == "prev") {
+          int cursor = 0;
+          int lastBefore = -1;
+          while (cursor != -1) {
+            cursor = lower.indexOf(needle, cursor);
+            if (cursor == -1) break;
+            if (cursor < start) {
+              lastBefore = cursor;
+              cursor += needle.length;
+            } else {
+              break;
+            }
+          }
+          if (lastBefore != -1) {
+            index = lastBefore;
+          } else {
+            // Wrap to the final occurrence in the buffer.
+            int wrap = -1;
+            int c = 0;
+            while (c != -1) {
+              c = lower.indexOf(needle, c);
+              if (c != -1) {
+                wrap = c;
+                c += needle.length;
+              }
+            }
+            index = wrap;
+          }
+        } else {
+          index = lower.indexOf(needle, start);
+          if (index == -1) index = lower.indexOf(needle);
+        }
+
         if (index != -1) {
           // Map the string offset to grid (col,row) so we can select the
           // matched run. xterm has no find engine, so we surface the match by
@@ -379,6 +443,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   @override
   void dispose() {
     widget.control.removeInvokeMethodListener(_handleMethodCall);
+    _terminalController.removeListener(_onSelectionChanged);
     _channelSub?.cancel();
     _channel?.close();
     _focusNode.dispose();
