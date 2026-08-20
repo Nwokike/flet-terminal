@@ -2,6 +2,8 @@
 
 `DemoState` is an @ft.observable model; the terminal and PTY service are
 created once per mount (use_state factory) and torn down on unmount.
+Terminal settings live in a floating action button that mirrors the
+ExtraKeysBar settings menu (themes, cursor, zoom, blink, search, clipboard).
 """
 
 from __future__ import annotations
@@ -24,6 +26,11 @@ class DemoState:
     def __init__(self):
         self.engines: list[str] = PTYService.available_engines()
         self.active_engine: str = PTYService.get_default_engine()
+        # Terminal settings (drive the FAB menu checkmarks)
+        self.theme: str = "JetBrains Dark"
+        self.cursor: str = "block"
+        self.blink: bool = True
+        self.search: bool = False
 
 
 def _make_resize_handler(pty: PTYService):
@@ -42,11 +49,12 @@ def _make_bundle(page: ft.Page):
     """Create the long-lived terminal + PTY pair (runs once per mount).
 
     Every handler is wired before the controls enter the component tree.
+    Settings live in the app-level FAB, so the keys-bar gear is hidden.
     """
     mt = MobileTerminal(
         show_extra_keys=True,
         show_search=False,
-        show_settings=True,
+        show_settings=False,
         scrollback=10000,
         font_family="JetBrains Mono",
         cursor_style="block",
@@ -66,6 +74,23 @@ def _make_bundle(page: ft.Page):
     return mt, pty
 
 
+def _header(label: str) -> ft.PopupMenuItem:
+    return ft.PopupMenuItem(
+        content=ft.Text(label, weight=ft.FontWeight.BOLD), disabled=True
+    )
+
+
+def _item(
+    label: str,
+    icon,
+    on_click,
+    checked: bool | None = None,
+) -> ft.PopupMenuItem:
+    return ft.PopupMenuItem(
+        content=ft.Text(label), icon=icon, on_click=on_click, checked=checked
+    )
+
+
 @ft.component
 def App() -> ft.Control:
     page = ft.context.page
@@ -77,6 +102,31 @@ def App() -> ft.Control:
         mt.clear()
         pty.start_session(engine_name)
         ds.active_engine = engine_name
+
+    def pick_theme(name: str):
+        ds.theme = name
+        mt.set_theme(name)
+
+    def pick_cursor(style: str):
+        ds.cursor = style
+        mt.set_cursor_style(style)
+
+    def zoom_in():
+        mt.zoom_in()
+
+    def zoom_out():
+        mt.zoom_out()
+
+    def zoom_reset():
+        mt.reset_zoom()
+
+    def toggle_blink():
+        ds.blink = not ds.blink
+        mt.toggle_cursor_blink()
+
+    def toggle_search():
+        ds.search = not ds.search
+        mt.toggle_search()
 
     def run_matrix():
         mt.write("\r\n\x1b[32m=== ANSI Color & Style Matrix ===\x1b[0m\r\n")
@@ -130,9 +180,102 @@ def App() -> ft.Control:
         on_run_matrix=run_matrix,
         on_run_stress=run_stress,
         on_run_alt_screen=run_alt_screen,
+        on_toggle_search=toggle_search,
     )
 
-    return ft.SafeArea(content=ft.Column(controls=[appbar, mt], spacing=0, expand=True))
+    settings_items = [
+        _header("Clipboard"),
+        _item("Copy Selection", ft.Icons.COPY_ROUNDED, lambda e: mt.copy_selection()),
+        _item("Paste", ft.Icons.CONTENT_PASTE_ROUNDED, lambda e: mt.paste()),
+        _item("Select All", ft.Icons.SELECT_ALL_ROUNDED, lambda e: mt.select_all()),
+        _item("Clear Terminal", ft.Icons.CLEAR_ALL_ROUNDED, lambda e: mt.clear()),
+        ft.PopupMenuItem(),
+        _header("Theme Presets"),
+        _item(
+            "Dracula",
+            ft.Icons.PALETTE_ROUNDED,
+            lambda e: pick_theme("Dracula"),
+            ds.theme == "Dracula",
+        ),
+        _item(
+            "JetBrains Dark",
+            ft.Icons.PALETTE_ROUNDED,
+            lambda e: pick_theme("JetBrains Dark"),
+            ds.theme == "JetBrains Dark",
+        ),
+        _item(
+            "Matrix Green",
+            ft.Icons.PALETTE_ROUNDED,
+            lambda e: pick_theme("Matrix Green"),
+            ds.theme == "Matrix Green",
+        ),
+        _item(
+            "Colab Light",
+            ft.Icons.PALETTE_ROUNDED,
+            lambda e: pick_theme("Colab Light"),
+            ds.theme == "Colab Light",
+        ),
+        ft.PopupMenuItem(),
+        _header("Cursor Style"),
+        _item(
+            "Block",
+            ft.Icons.TEXT_FIELDS_ROUNDED,
+            lambda e: pick_cursor("block"),
+            ds.cursor == "block",
+        ),
+        _item(
+            "Underline",
+            ft.Icons.TEXT_FIELDS_ROUNDED,
+            lambda e: pick_cursor("underline"),
+            ds.cursor == "underline",
+        ),
+        _item(
+            "Bar",
+            ft.Icons.TEXT_FIELDS_ROUNDED,
+            lambda e: pick_cursor("bar"),
+            ds.cursor == "bar",
+        ),
+        ft.PopupMenuItem(),
+        _header("Font Size / Zoom"),
+        _item("Zoom In (+)", ft.Icons.ADD_ROUNDED, lambda e: zoom_in()),
+        _item("Zoom Out (-)", ft.Icons.REMOVE_ROUNDED, lambda e: zoom_out()),
+        _item("Reset Zoom (11px)", ft.Icons.FIT_SCREEN_ROUNDED, lambda e: zoom_reset()),
+        ft.PopupMenuItem(),
+        _header("Toggle Options"),
+        _item(
+            "Cursor Blink",
+            ft.Icons.VISIBILITY_ROUNDED,
+            lambda e: toggle_blink(),
+            ds.blink,
+        ),
+        _item(
+            "Search Bar", ft.Icons.SEARCH_ROUNDED, lambda e: toggle_search(), ds.search
+        ),
+    ]
+
+    settings_fab = ft.FloatingActionButton(
+        content=ft.PopupMenuButton(
+            items=settings_items,
+            icon=ft.Icons.SETTINGS_ROUNDED,
+            icon_color=ft.Colors.WHITE,
+            icon_size=20,
+        ),
+        bgcolor="#F97316",
+        mini=True,
+        tooltip="Terminal Settings",
+        margin=ft.Padding(0, 0, 52, 16),
+    )
+
+    return ft.SafeArea(
+        content=ft.Stack(
+            controls=[
+                ft.Column(controls=[appbar, mt], spacing=0, expand=True),
+                settings_fab,
+            ],
+            alignment=ft.alignment.Alignment.BOTTOM_RIGHT,
+            expand=True,
+        )
+    )
 
 
 __all__ = ["App", "DemoState"]

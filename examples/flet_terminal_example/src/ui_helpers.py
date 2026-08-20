@@ -18,6 +18,7 @@ def build_demo_appbar(
     on_run_matrix: Callable[[], None],
     on_run_stress: Callable[[], None],
     on_run_alt_screen: Callable[[], None],
+    on_toggle_search: Callable[[], None] | None = None,
 ) -> ft.AppBar:
     """Build the responsive header bar with engine dropdown, demos, and zoom controls."""
 
@@ -89,7 +90,9 @@ def build_demo_appbar(
         icon_size=18,
         tooltip="Toggle Search Bar",
         style=ft.ButtonStyle(padding=2, visual_density=ft.VisualDensity.COMPACT),
-        on_click=lambda e: mt.toggle_search(),
+        on_click=lambda e: (
+            on_toggle_search() if on_toggle_search else mt.toggle_search()
+        ),
     )
 
     return ft.AppBar(

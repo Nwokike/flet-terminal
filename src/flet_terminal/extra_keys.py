@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 import flet as ft
 
+from .frozen_support import thaw
 from .tokens import (
     BTN_FONT_SIZE,
     BTN_HEIGHT,
@@ -274,12 +275,15 @@ class ExtraKeysBar(ft.Container):
     def update_settings_menu(self):
         """Refresh the items and checkmarks inside the settings menu."""
         if hasattr(self, "_settings_menu") and self._settings_menu:
-            self._settings_menu.items = self._get_settings_menu_items()
+            with thaw(self._settings_menu):
+                self._settings_menu.items = self._get_settings_menu_items()
             try:
                 if self._settings_menu.page:
-                    self._settings_menu.update()
+                    with thaw(self._settings_menu):
+                        self._settings_menu.update()
                 elif self.page:
-                    self.update()
+                    with thaw(self):
+                        self.update()
             except RuntimeError:
                 pass
 
@@ -336,13 +340,15 @@ class ExtraKeysBar(ft.Container):
 
     def refresh_buttons(self):
         if self._btn_ctrl:
-            self._btn_ctrl.style = self._get_modifier_style(self.ctrl_active)
-            if self._btn_ctrl.page:
-                self._btn_ctrl.update()
+            with thaw(self._btn_ctrl):
+                self._btn_ctrl.style = self._get_modifier_style(self.ctrl_active)
+                if self._btn_ctrl.page:
+                    self._btn_ctrl.update()
         if self._btn_alt:
-            self._btn_alt.style = self._get_modifier_style(self.alt_active)
-            if self._btn_alt.page:
-                self._btn_alt.update()
+            with thaw(self._btn_alt):
+                self._btn_alt.style = self._get_modifier_style(self.alt_active)
+                if self._btn_alt.page:
+                    self._btn_alt.update()
 
     def reset_modifiers(self):
         if self.ctrl_active or self.alt_active:
@@ -370,12 +376,15 @@ class ExtraKeysBar(ft.Container):
 
     def _on_toggle_collapse(self, e):
         self._collapsed = not self._collapsed
-        if self._collapsed:
-            self._toggle_btn.icon = ft.Icons.ARROW_DROP_DOWN
-            self._toggle_btn.tooltip = "Show keys"
-            self.content = self._collapsed_view
-        else:
-            self._toggle_btn.icon = ft.Icons.ARROW_DROP_UP
-            self._toggle_btn.tooltip = "Hide keys"
-            self.content = self._expanded_row
-        self.update()
+        with thaw(self._toggle_btn):
+            if self._collapsed:
+                self._toggle_btn.icon = ft.Icons.ARROW_DROP_DOWN
+                self._toggle_btn.tooltip = "Show keys"
+            else:
+                self._toggle_btn.icon = ft.Icons.ARROW_DROP_UP
+                self._toggle_btn.tooltip = "Hide keys"
+        with thaw(self):
+            self.content = (
+                self._collapsed_view if self._collapsed else self._expanded_row
+            )
+            self.update()

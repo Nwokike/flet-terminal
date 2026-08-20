@@ -5,6 +5,7 @@ from typing import Any, Callable
 import flet as ft
 from .terminal import Terminal
 from .extra_keys import ExtraKeysBar, DEFAULT_EXTRA_KEYS
+from .frozen_support import thaw
 from .search_bar import TerminalSearchBar
 from .themes import get_theme, BUILTIN_THEMES
 
@@ -118,11 +119,13 @@ class MobileTerminal(ft.Column):
             self._user_on_selection_change(e)
 
     def _on_modifier_change(self, ctrl: bool, alt: bool):
-        self._terminal.ctrl_active = ctrl
-        self._terminal.alt_active = alt
+        with thaw(self._terminal):
+            self._terminal.ctrl_active = ctrl
+            self._terminal.alt_active = alt
         try:
             if self._terminal.page:
-                self._terminal.update()
+                with thaw(self._terminal):
+                    self._terminal.update()
         except RuntimeError:
             pass
 
@@ -145,13 +148,15 @@ class MobileTerminal(ft.Column):
             else:
                 self.controls.append(self._search_bar)
         if self._search_bar:
-            self._search_bar.visible = val
+            with thaw(self._search_bar):
+                self._search_bar.visible = val
             if self._keys_bar:
                 self._keys_bar.active_search = val
                 self._keys_bar.update_settings_menu()
             try:
                 if self.page:
-                    self.update()
+                    with thaw(self):
+                        self.update()
             except RuntimeError:
                 pass
 
@@ -166,10 +171,12 @@ class MobileTerminal(ft.Column):
         """Switch the active terminal color theme by name."""
         preset = get_theme(theme_name)
         if preset:
-            self._terminal.theme = preset
+            with thaw(self._terminal):
+                self._terminal.theme = preset
             try:
                 if self._terminal.page:
-                    self._terminal.update()
+                    with thaw(self._terminal):
+                        self._terminal.update()
             except RuntimeError:
                 pass
             if self._keys_bar:
@@ -178,10 +185,12 @@ class MobileTerminal(ft.Column):
 
     def set_cursor_style(self, style: str):
         """Set cursor shape ('block', 'underline', 'bar')."""
-        self._terminal.cursor_style = style
+        with thaw(self._terminal):
+            self._terminal.cursor_style = style
         try:
             if self._terminal.page:
-                self._terminal.update()
+                with thaw(self._terminal):
+                    self._terminal.update()
         except RuntimeError:
             pass
         if self._keys_bar:
@@ -190,10 +199,12 @@ class MobileTerminal(ft.Column):
 
     def toggle_cursor_blink(self):
         """Toggle blinking animation for the cursor."""
-        self._terminal.cursor_blink = not self._terminal.cursor_blink
+        with thaw(self._terminal):
+            self._terminal.cursor_blink = not self._terminal.cursor_blink
         try:
             if self._terminal.page:
-                self._terminal.update()
+                with thaw(self._terminal):
+                    self._terminal.update()
         except RuntimeError:
             pass
         if self._keys_bar:
@@ -204,10 +215,12 @@ class MobileTerminal(ft.Column):
         """Increase terminal font size."""
         current = self._terminal.font_size or 11.0
         new_size = current + step
-        self._terminal.font_size = new_size
+        with thaw(self._terminal):
+            self._terminal.font_size = new_size
         try:
             if self._terminal.page:
-                self._terminal.update()
+                with thaw(self._terminal):
+                    self._terminal.update()
         except RuntimeError:
             pass
         if self._keys_bar:
@@ -219,10 +232,12 @@ class MobileTerminal(ft.Column):
         current = self._terminal.font_size or 11.0
         if current > 6.0:
             new_size = max(6.0, current - step)
-            self._terminal.font_size = new_size
+            with thaw(self._terminal):
+                self._terminal.font_size = new_size
             try:
                 if self._terminal.page:
-                    self._terminal.update()
+                    with thaw(self._terminal):
+                        self._terminal.update()
             except RuntimeError:
                 pass
             if self._keys_bar:
@@ -231,10 +246,12 @@ class MobileTerminal(ft.Column):
 
     def reset_zoom(self):
         """Reset terminal font size to original default."""
-        self._terminal.font_size = self._default_font_size
+        with thaw(self._terminal):
+            self._terminal.font_size = self._default_font_size
         try:
             if self._terminal.page:
-                self._terminal.update()
+                with thaw(self._terminal):
+                    self._terminal.update()
         except RuntimeError:
             pass
         if self._keys_bar:
@@ -249,7 +266,8 @@ class MobileTerminal(ft.Column):
 
     @ctrl_active.setter
     def ctrl_active(self, val: bool):
-        self._terminal.ctrl_active = val
+        with thaw(self._terminal):
+            self._terminal.ctrl_active = val
         if self._keys_bar:
             self._keys_bar.ctrl_active = val
             self._keys_bar.refresh_buttons()
@@ -260,7 +278,8 @@ class MobileTerminal(ft.Column):
 
     @alt_active.setter
     def alt_active(self, val: bool):
-        self._terminal.alt_active = val
+        with thaw(self._terminal):
+            self._terminal.alt_active = val
         if self._keys_bar:
             self._keys_bar.alt_active = val
             self._keys_bar.refresh_buttons()

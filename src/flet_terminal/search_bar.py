@@ -1,8 +1,12 @@
 """TerminalSearchBar — compact search bar with match stepping and close."""
 
 from __future__ import annotations
+
 from typing import Callable
+
 import flet as ft
+
+from .frozen_support import thaw
 
 __all__ = ["TerminalSearchBar"]
 
@@ -96,17 +100,23 @@ class TerminalSearchBar(ft.Container):
         """Update the match counter from the terminal's selection_change event."""
         self._count = count
         self._last_index = index if found else -1
-        self._counter.value = f"{count} found" if found and count > 0 else "No matches"
-        self._counter.visible = True
+        with thaw(self._counter):
+            self._counter.value = (
+                f"{count} found" if found and count > 0 else "No matches"
+            )
+            self._counter.visible = True
         try:
             if self.page:
-                self.update()
+                with thaw(self):
+                    self.update()
         except RuntimeError:
             pass
 
     def _handle_close(self):
-        self._search_field.value = ""
-        self._counter.visible = False
+        with thaw(self._search_field):
+            self._search_field.value = ""
+        with thaw(self._counter):
+            self._counter.visible = False
         self._last_index = -1
         self._count = 0
         if self._on_close:
