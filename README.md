@@ -6,9 +6,11 @@
   <img src="https://img.shields.io/badge/Built%20with-Flet%200.86-00B0FF?style=for-the-badge&logo=flutter&logoColor=white" alt="Flet" />
 </p>
 
-A native, GPU-accelerated terminal control for [Flet](https://flet.dev/), built on top of [xterm.dart](https://github.com/PangolinDesktop/xterm.dart). 
+A native, GPU-accelerated terminal control for [Flet](https://flet.dev/), built on top of [xterm.dart](https://github.com/PangolinDesktop/xterm.dart).
 
 `flet-terminal` provides high-performance VT100/ANSI terminal emulation across **Windows, Linux, macOS, Android, and Web**, utilizing low-latency binary `DataChannel` streaming to render thousands of lines per second without UI freezing.
+
+Fully compatible with Flet 0.86's **declarative component model** (`@ft.component`, `@ft.observable`, `use_state`, `use_effect`) — including frozen-control safety via the built-in `thaw()` context manager.
 
 ---
 
@@ -28,9 +30,13 @@ Try the standalone **Flet Terminal** desktop application directly on your OS:
 
 - **High-Throughput Binary Streaming**: Routes terminal data over Flet `DataChannel` directly to the `xterm.dart` canvas, bypassing string/MsgPack serialization overhead.
 - **Cross-Platform Compatibility**: Full feature parity across Desktop (`pty` / `winpty`), Mobile (`Android`), and Web (`WASM` / `Pyodide`).
+- **Declarative-First Design**: Built for Flet 0.86's React-like component model. All internal mutations use `thaw()` to safely update frozen controls inside declarative trees.
 - **Responsive Mobile Wrapper & Zoom Controls**: `MobileTerminal` includes `zoom_in()`, `zoom_out()`, `reset_zoom()`, and a customizable virtual accessory keyboard (`ESC`, `TAB`, `CTRL`, `ALT`, arrows) with sticky modifier toggles and collapsible state.
-- **Dynamic Checkmarks & Built-in Themes**: Supports instant switching between built-in color schemes (`Dracula`, `JetBrains Dark`, `Matrix Green`), customizable font families (`JetBrains Mono`), cursor shapes (`block`, `underline`, `bar`), and cursor blink. Settings popup displays accurate checkmarks (`checked=True`) that dynamically tick as options change.
-- **Interactive Search & Selection**: Built-in buffer search (`search`), scrollback control, and clipboard integration (`select_all`, `clear_selection`, right-click copy/paste).
+- **Reactive CTRL/ALT Modifiers**: Sticky modifier buttons are `@ft.component` instances subscribed to an `@ft.observable` `ModifierState` — they repaint instantly on toggle, reset, or external state change.
+- **Real Cursor Blink**: A Dart-side `Timer.periodic` toggles `cursorVisibleMode` + `notifyListeners()` for true blink (upstream xterm 4.0.0 has no built-in blink).
+- **4 Built-in Themes**: `Dracula`, `JetBrains Dark`, `Matrix Green`, and `Colab Light` (Material light palette with orange cursor). Settings popup displays accurate checkmarks that update live.
+- **Interactive Search & Selection**: Built-in search bar with match counter, scrollback control, and clipboard integration (`select_all`, `copy_selection`, `paste`, `clear_selection`).
+- **Frozen-Control Safety**: The `thaw()` context manager (exported from `flet_terminal.frozen_support`) temporarily lifts Flet's `_frozen` flag so imperative mutations work inside declarative trees — the same pattern Flet uses internally in `_before_update_safe`.
 
 ---
 
@@ -52,11 +58,53 @@ uv add flet-terminal
 
 ## Quickstart
 
-### 1. Basic Terminal (`Terminal`)
+### 1. Declarative App (Recommended — Flet 0.86)
+
+```python
+import flet as ft
+from flet_terminal import MobileTerminal, BUILTIN_THEMES
+
+
+@ft.component
+def App():
+    page = ft.context.page
+    mt, _ = ft.use_state(lambda: MobileTerminal(
+        show_extra_keys=True,
+        show_search=False,
+        show_settings=True,
+        scrollback=10000,
+        font_family="JetBrains Mono",
+        font_size=13.0,
+        cursor_blink=True,
+        theme=BUILTIN_THEMES["JetBrains Dark"],
+        expand=True,
+    ))
+
+    def on_bytes(payload: bytes):
+        # Echo back or forward to a PTY / remote shell
+        mt.send_bytes(payload)
+
+    ft.use_effect(lambda: mt.set_on_bytes(on_bytes), [])
+
+    return ft.Column(controls=[mt], spacing=0, expand=True)
+
+
+def main(page: ft.Page):
+    page.title = "My Terminal"
+    page.theme_mode = ft.ThemeMode.DARK
+    page.padding = 0
+    page.render(App)
+
+
+ft.run(main)
+```
+
+### 2. Basic Terminal (`Terminal`)
 
 ```python
 import flet as ft
 from flet_terminal import Terminal, BUILTIN_THEMES
+
 
 def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.DARK
@@ -65,53 +113,34 @@ def main(page: ft.Page):
         scrollback=10000,
         font_family="JetBrains Mono",
         font_size=13.0,
-        cursor_style="block",
         cursor_blink=True,
         theme=BUILTIN_THEMES["Dracula"],
         expand=True,
     )
 
-    # Handle incoming bytes typed or pasted into the terminal
     def on_terminal_input(data: bytes):
-        # Echo back or forward to a local OS shell / PTY process
         term.send_bytes(data)
 
     term.set_on_bytes(on_terminal_input)
-
     page.add(term)
     term.write("\x1b[1;32mWelcome to FletTerminal!\x1b[0m\r\n> ")
 
+
 ft.run(main)
 ```
 
-### 2. Responsive Mobile Wrapper (`MobileTerminal`)
+### 3. Imperative Construction Inside Async Tasks
 
-`MobileTerminal` combines the core `Terminal` with a virtual extra-keys bar, sticky modifier buttons (`CTRL`, `ALT`), settings menu, and search bar:
+If you build `MobileTerminal` outside a component render (e.g. inside `page.run_task`), wrap construction in a throwaway renderer so the internal `@ft.component` buttons can instantiate:
 
 ```python
-import flet as ft
-from flet_terminal import MobileTerminal, BUILTIN_THEMES
+from flet.components.component import Renderer
 
-def main(page: ft.Page):
-    mt = MobileTerminal(
-        show_extra_keys=True,
-        show_search=True,
-        show_settings=True,
-        scrollback=10000,
-        font_family="JetBrains Mono",
-        font_size=13.0,
-        theme=BUILTIN_THEMES["JetBrains Dark"],
-        expand=True,
-    )
-
-    def on_bytes(payload: bytes):
-        mt.send_bytes(payload)
-
-    mt.set_on_bytes(on_bytes)
-    page.add(mt)
-
-ft.run(main)
+with Renderer().with_context():
+    mt = MobileTerminal(theme=BUILTIN_THEMES["JetBrains Dark"], expand=True)
 ```
+
+Reactivity is unaffected — `Component.update()` creates its own renderer on every re-render.
 
 ---
 
@@ -124,9 +153,9 @@ ft.run(main)
 | `scrollback` | `int` | `10000` | Maximum number of scrollback lines retained in the ring buffer. |
 | `font_family` | `str` | `"JetBrains Mono"` | Monospace font family for rendering text. |
 | `font_size` | `float` | `13.0` | Font point size. |
-| `cursor_style` | `str` | `"block"` | Cursor shape (`"block"`, `"underline"`, or `"bar"`). |
-| `cursor_blink` | `bool` | `True` | Whether the terminal cursor blinks continuously. |
-| `theme` | `dict` | `None` | Dictionary mapping ANSI color keys to hex/int colors. |
+| `cursor_style` | `str` | `"block"` | Cursor shape. Currently only `"block"` is supported (underline/bar removed due to upstream xterm 4.0.0 painter bug). |
+| `cursor_blink` | `bool` | `True` | Whether the terminal cursor blinks (real Dart-side timer). |
+| `theme` | `dict` | `None` | Dictionary mapping ANSI color keys to hex colors. |
 | `read_only` | `bool` | `False` | When `True`, disables user keyboard input into the terminal canvas. |
 | `auto_focus` | `bool` | `True` | Automatically focuses the terminal when mounted. |
 
@@ -138,9 +167,10 @@ ft.run(main)
 | `write(data)` | `str \| bytes` | Writes text or escape sequences to the terminal. |
 | `clear()` | — | Clears the terminal scrollback and visible screen buffer. |
 | `focus()` | — | Requests keyboard focus on the terminal control. |
-| `search(query, start)` | `str, int` | Highlights and selects matching text in the scrollback buffer. |
+| `search(query, start, direction)` | `str, int, str` | Highlights and selects matching text in the scrollback buffer. |
 | `select_all()` | — | Selects all text currently in the buffer. |
 | `clear_selection()` | — | Clears any active selection. |
+| `paste()` | — | Pastes clipboard content into the terminal. |
 
 ### `Terminal` Events
 
@@ -152,18 +182,79 @@ ft.run(main)
 | `on_bell` | `Callable[[ft.ControlEvent], None]` | Triggered when the bell character (`\a` / `0x07`) is received. |
 | `on_selection_change` | `Callable[[ft.ControlEvent], None]` | Fired when selection or search matches update. |
 
+### `MobileTerminal` Additional Methods & Properties
+
+| Method / Property | Description |
+| :--- | :--- |
+| `set_theme(name)` | Switch to a built-in theme by name. |
+| `set_cursor_style(style)` | Set cursor style (currently `"block"` only). |
+| `toggle_cursor_blink()` | Toggle cursor blink on/off. |
+| `zoom_in(step=1.0)` | Increase font size. |
+| `zoom_out(step=1.0)` | Decrease font size. |
+| `reset_zoom()` | Reset to default font size. |
+| `toggle_search()` | Show/hide the built-in search bar. |
+| `copy_selection()` | Copy selected text to clipboard. |
+| `paste()` | Paste clipboard into terminal. |
+| `select_all()` / `clear_selection()` | Selection helpers. |
+| `send_bytes(payload)` / `write(data)` / `clear()` / `focus()` | Inherited from `Terminal`. |
+| `set_on_bytes(handler)` | Register the input handler. |
+| **Read-only properties** | |
+| `font_size` | Current font size. |
+| `cursor_blink` | Current blink state. |
+| `cursor_style` | Current cursor style. |
+| `theme_name` | Active theme name (or `None`). |
+| `show_search` | Whether search bar is visible (settable). |
+| `ctrl_active` / `alt_active` | Sticky modifier state (settable). |
+
+### `ExtraKeysBar` Constructor
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `on_send_payload` | `Callable[[bytes], None]` | required | Called with the final byte payload after modifier processing. |
+| `on_modifier_change` | `Callable[[bool, bool], None]` | required | Called with `(ctrl, alt)` when sticky state changes. |
+| `show_settings` | `bool` | `True` | Show the gear icon settings popup. |
+| `on_set_theme` | `Callable[[str], None]` | `None` | Theme preset callback. |
+| `on_set_cursor` | `Callable[[str], None]` | `None` | Cursor style callback. |
+| `on_toggle_blink` | `Callable[[], None]` | `None` | Blink toggle callback. |
+| `on_toggle_search` | `Callable[[], None]` | `None` | Search toggle callback. |
+| `on_copy` / `on_paste` / `on_select_all` / `on_clear` | `Callable[[], None]` | `None` | Clipboard/buffer callbacks. |
+| `keys` | `list[tuple[str, bytes \| None]]` | `DEFAULT_EXTRA_KEYS` | Custom key layout. `None` payload = modifier key. |
+
 ---
 
 ## Built-in Themes
 
-You can import and pass built-in presets from `flet_terminal.themes`:
-
 ```python
 from flet_terminal import BUILTIN_THEMES, get_theme
 
-# Available: "Dracula", "JetBrains Dark", "Matrix Green"
+# Available: "Dracula", "JetBrains Dark", "Matrix Green", "Colab Light"
 my_theme = get_theme("Dracula")
 ```
+
+| Theme | Background | Cursor | Best for |
+| :--- | :--- | :--- | :--- |
+| **Dracula** | `#1E1F29` | `#FF79C6` (pink) | Dark mode default |
+| **JetBrains Dark** | `#1E1E2E` | `#F5E0DC` (warm white) | Dark mode (Catppuccin-inspired) |
+| **Matrix Green** | `#0D1117` | `#00FF66` (green) | Retro / hacker aesthetic |
+| **Colab Light** | `#FFFFFF` | `#F97316` (orange) | Light mode / follows app theme |
+
+---
+
+## Frozen-Control Support
+
+Flet 0.86's declarative renderer stamps `_frozen = True` on all component-rendered controls. Imperative mutations (`.update()`, property assignment) raise `RuntimeError: Frozen controls cannot be updated.`
+
+`flet_terminal` handles this internally via `thaw()`:
+
+```python
+from flet_terminal.frozen_support import thaw
+
+with thaw(some_control):
+    some_control.style = new_style
+    some_control.update()
+```
+
+All `MobileTerminal` setters (`set_theme`, `zoom_in`, `toggle_search`, etc.) and `ExtraKeysBar` mutations already use `thaw()` internally — no extra wrapping needed by consumers.
 
 ---
 
