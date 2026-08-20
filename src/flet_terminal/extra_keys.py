@@ -198,32 +198,6 @@ class ExtraKeysBar(ft.Container):
             ),
             ft.PopupMenuItem(),
             ft.PopupMenuItem(
-                content=ft.Text("Cursor Style", weight=ft.FontWeight.BOLD),
-                disabled=True,
-            ),
-            ft.PopupMenuItem(
-                content=ft.Text("Block"),
-                checked=self.active_cursor == "block",
-                on_click=lambda e: (
-                    self._on_set_cursor("block") if self._on_set_cursor else None
-                ),
-            ),
-            ft.PopupMenuItem(
-                content=ft.Text("Underline"),
-                checked=self.active_cursor == "underline",
-                on_click=lambda e: (
-                    self._on_set_cursor("underline") if self._on_set_cursor else None
-                ),
-            ),
-            ft.PopupMenuItem(
-                content=ft.Text("Bar"),
-                checked=self.active_cursor == "bar",
-                on_click=lambda e: (
-                    self._on_set_cursor("bar") if self._on_set_cursor else None
-                ),
-            ),
-            ft.PopupMenuItem(),
-            ft.PopupMenuItem(
                 content=ft.Text("Font Size / Zoom", weight=ft.FontWeight.BOLD),
                 disabled=True,
             ),

@@ -46,17 +46,19 @@ class MobileTerminal(ft.Column):
         )
         self._default_font_size = font_size
 
-        self._search_bar: TerminalSearchBar | None = None
+        # The search bar is created upfront (hidden by default) rather than
+        # lazily on first toggle: injecting a brand-new child into the tree
+        # after Flet's first declarative render never reaches the client,
+        # while flipping `visible` on a stable child always diffs cleanly.
+        self._search_bar = TerminalSearchBar(
+            on_search=self._terminal.search,
+            on_close=lambda: self.toggle_search(),
+        )
+        self._search_bar.visible = bool(show_search)
         self._user_on_selection_change = None
-        if show_search:
-            self._search_bar = TerminalSearchBar(
-                on_search=self._terminal.search,
-                on_close=lambda: self.toggle_search(),
-            )
-            self._search_bar.visible = True
-            # Route search results into the bar's match counter while still
-            # forwarding the event to any user-supplied handler.
-            self._terminal.on_selection_change = self._internal_on_selection_change
+        # Route search results into the bar's match counter while still
+        # forwarding the event to any user-supplied handler.
+        self._terminal.on_selection_change = self._internal_on_selection_change
 
         self._keys_bar: ExtraKeysBar | None = None
         if show_extra_keys:
@@ -91,9 +93,7 @@ class MobileTerminal(ft.Column):
                 self._keys_bar.active_theme = "JetBrains Dark"
             self._keys_bar.update_settings_menu()
 
-        controls: list[ft.Control] = [self._terminal]
-        if self._search_bar:
-            controls.append(self._search_bar)
+        controls: list[ft.Control] = [self._terminal, self._search_bar]
         if self._keys_bar:
             controls.append(self._keys_bar)
 
@@ -131,35 +131,25 @@ class MobileTerminal(ft.Column):
 
     @property
     def show_search(self) -> bool:
-        return self._search_bar.visible if self._search_bar else False
+        return bool(self._search_bar.visible)
 
     @show_search.setter
     def show_search(self, val: bool):
-        if not self._search_bar and val:
-            self._search_bar = TerminalSearchBar(
-                on_search=self._terminal.search,
-                on_close=lambda: self.toggle_search(),
-            )
-            with thaw(self._terminal):
-                self._terminal.on_selection_change = self._internal_on_selection_change
-            if self._keys_bar and self._keys_bar in self.controls:
-                self.controls.insert(
-                    self.controls.index(self._keys_bar), self._search_bar
-                )
-            else:
-                self.controls.append(self._search_bar)
-        if self._search_bar:
-            with thaw(self._search_bar):
-                self._search_bar.visible = val
-            if self._keys_bar:
-                self._keys_bar.active_search = val
-                self._keys_bar.update_settings_menu()
-            try:
-                if self.page:
-                    with thaw(self):
-                        self.update()
-            except RuntimeError:
-                pass
+        bar = self._search_bar
+        with thaw(bar):
+            bar.visible = bool(val)
+        if self._keys_bar:
+            self._keys_bar.active_search = bool(val)
+            self._keys_bar.update_settings_menu()
+        try:
+            # In declarative Flet 0.86 the wrapper's update() is swallowed
+            # (component-mode diff ignores it). Pushing the diff of the
+            # bar itself is what actually emits a "visible" op.
+            if bar.page:
+                with thaw(bar):
+                    bar.update()
+        except RuntimeError:
+            pass
 
     def toggle_search(self):
         """Toggle visibility of the search bar."""

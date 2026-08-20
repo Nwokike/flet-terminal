@@ -25,6 +25,9 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   final ScrollController _scrollController = ScrollController();
   DataChannel? _channel;
   StreamSubscription<Uint8List>? _channelSub;
+  Timer? _blinkTimer;
+  bool _blinkOn = true;
+  bool? _syncedBlink;
 
   @override
   void initState() {
@@ -34,6 +37,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
 
     final maxLines = widget.control.getInt("scrollback", 10000)!;
     _terminal = qt.Terminal(maxLines: maxLines);
+    _syncBlink(widget.control.getBool("cursor_blink", true)!);
 
     // Surface real user selections (long-press word select, drag select) to
     // Python. Previously selection_change only fired from the search method.
@@ -351,6 +355,10 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     final style = _parseStyle();
     final cursorType = _parseCursorType(widget.control.getString("cursor_style"));
     final cursorBlink = widget.control.getBool("cursor_blink", true)!;
+    if (cursorBlink != _syncedBlink) {
+      _syncedBlink = cursorBlink;
+      _syncBlink(cursorBlink);
+    }
     final autofocus = widget.control.getBool("auto_focus", true)!;
     final readOnly = widget.control.getBool("read_only", false)!;
 
@@ -367,7 +375,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
       autofocus: autofocus,
       readOnly: readOnly,
       cursorType: cursorType,
-      alwaysShowCursor: cursorBlink,
+      alwaysShowCursor: false,
       deleteDetection: isMobile,
       keyboardType: TextInputType.text,
       onSecondaryTapUp: (details, offset) async {
@@ -440,8 +448,35 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     }
   }
 
+  /// Drives the cursor blink by toggling the terminal's cursor-visibility
+  /// mode on a periodic timer. xterm has no built-in blink: `alwaysShowCursor`
+  /// only *adds* visibility and `cursorVisibleMode` defaults to true, so the
+  /// cursor never actually hid. Toggling `cursorVisibleMode` (and forcing a
+  /// repaint via `notifyListeners`, since the setter alone doesn't notify) is
+  /// what produces a real blink. When blinking is disabled the cursor is
+  /// restored to always-visible.
+  void _syncBlink(bool blink) {
+    _blinkTimer?.cancel();
+    _blinkTimer = null;
+    if (blink) {
+      _blinkOn = true;
+      _terminal.setCursorVisibleMode(true);
+      _blinkTimer = Timer.periodic(const Duration(milliseconds: 530), (_) {
+        if (!mounted) return;
+        _blinkOn = !_blinkOn;
+        _terminal.setCursorVisibleMode(_blinkOn);
+        _terminal.notifyListeners();
+      });
+    } else {
+      _terminal.setCursorVisibleMode(true);
+      _terminal.notifyListeners();
+    }
+  }
+
   @override
   void dispose() {
+    _blinkTimer?.cancel();
+    _blinkTimer = null;
     widget.control.removeInvokeMethodListener(_handleMethodCall);
     _terminalController.removeListener(_onSelectionChanged);
     _channelSub?.cancel();

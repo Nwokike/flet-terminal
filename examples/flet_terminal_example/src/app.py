@@ -28,7 +28,6 @@ class DemoState:
         self.active_engine: str = PTYService.get_default_engine()
         # Terminal settings (drive the FAB menu checkmarks)
         self.theme: str = "JetBrains Dark"
-        self.cursor: str = "block"
         self.blink: bool = True
         self.search: bool = False
 
@@ -107,10 +106,6 @@ def App() -> ft.Control:
         ds.theme = name
         mt.set_theme(name)
 
-    def pick_cursor(style: str):
-        ds.cursor = style
-        mt.set_cursor_style(style)
-
     def zoom_in():
         mt.zoom_in()
 
@@ -188,58 +183,42 @@ def App() -> ft.Control:
         _item("Copy Selection", ft.Icons.COPY_ROUNDED, lambda e: mt.copy_selection()),
         _item("Paste", ft.Icons.CONTENT_PASTE_ROUNDED, lambda e: mt.paste()),
         _item("Select All", ft.Icons.SELECT_ALL_ROUNDED, lambda e: mt.select_all()),
-        _item("Clear Terminal", ft.Icons.CLEAR_ALL_ROUNDED, lambda e: mt.clear()),
+        _item(
+            "Clear Terminal",
+            ft.Icons.CLEAR_ALL_ROUNDED,
+            lambda e: pty.write(b"\x0c"),  # Ctrl+L: redraw prompt at top
+        ),
         ft.PopupMenuItem(),
         _header("Theme Presets"),
         _item(
             "Dracula",
-            ft.Icons.PALETTE_ROUNDED,
+            ft.Icons.DARK_MODE_ROUNDED,
             lambda e: pick_theme("Dracula"),
             ds.theme == "Dracula",
         ),
         _item(
             "JetBrains Dark",
-            ft.Icons.PALETTE_ROUNDED,
+            ft.Icons.CODE_ROUNDED,
             lambda e: pick_theme("JetBrains Dark"),
             ds.theme == "JetBrains Dark",
         ),
         _item(
             "Matrix Green",
-            ft.Icons.PALETTE_ROUNDED,
+            ft.Icons.GRID_ON_ROUNDED,
             lambda e: pick_theme("Matrix Green"),
             ds.theme == "Matrix Green",
         ),
         _item(
             "Colab Light",
-            ft.Icons.PALETTE_ROUNDED,
+            ft.Icons.LIGHT_MODE_ROUNDED,
             lambda e: pick_theme("Colab Light"),
             ds.theme == "Colab Light",
         ),
         ft.PopupMenuItem(),
-        _header("Cursor Style"),
-        _item(
-            "Block",
-            ft.Icons.TEXT_FIELDS_ROUNDED,
-            lambda e: pick_cursor("block"),
-            ds.cursor == "block",
-        ),
-        _item(
-            "Underline",
-            ft.Icons.TEXT_FIELDS_ROUNDED,
-            lambda e: pick_cursor("underline"),
-            ds.cursor == "underline",
-        ),
-        _item(
-            "Bar",
-            ft.Icons.TEXT_FIELDS_ROUNDED,
-            lambda e: pick_cursor("bar"),
-            ds.cursor == "bar",
-        ),
-        ft.PopupMenuItem(),
         _header("Font Size / Zoom"),
-        _item("Zoom In (+)", ft.Icons.ADD_ROUNDED, lambda e: zoom_in()),
-        _item("Zoom Out (-)", ft.Icons.REMOVE_ROUNDED, lambda e: zoom_out()),
-        _item("Reset Zoom (11px)", ft.Icons.FIT_SCREEN_ROUNDED, lambda e: zoom_reset()),
+        _item("Zoom In", ft.Icons.ADD_ROUNDED, lambda e: zoom_in()),
+        _item("Zoom Out", ft.Icons.REMOVE_ROUNDED, lambda e: zoom_out()),
+        _item("Reset Zoom", ft.Icons.FIT_SCREEN_ROUNDED, lambda e: zoom_reset()),
         ft.PopupMenuItem(),
         _header("Toggle Options"),
         _item(
