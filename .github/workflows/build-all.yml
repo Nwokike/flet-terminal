@@ -20,7 +20,7 @@ permissions:
 env:
   PYTHONUTF8: "1"
   FLET_CLI_NO_RICH_OUTPUT: "1"
-  UV_PYTHON: "3.12"
+  UV_PYTHON: "3.14"
   BUILD_VERSION: ${{ inputs.build_version || '0.3.7' }}
   BUILD_NUMBER: ${{ inputs.build_number || '1' }}
 
