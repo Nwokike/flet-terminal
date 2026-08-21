@@ -1,14 +1,14 @@
 [project]
 name = "flet-terminal"
-version = "0.3.6"
+version = "0.3.7"
 description = "Native GPU-accelerated Terminal control for Flet using xterm.dart"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 authors = [
     { name = "Onyeka Nwokike", email = "nwokikeonyeka@gmail.com" }
 ]
 dependencies = [
-    "flet>=0.85.3",
+    "flet>=0.86.5",
 ]
 
 [project.urls]

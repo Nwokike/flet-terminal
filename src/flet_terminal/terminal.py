@@ -1,8 +1,12 @@
+import logging
 import threading
-from typing import Any, Optional
+from typing import Any
+
 import flet as ft
 from flet.controls.base_control import control
-from flet.data_channel import DataChannelOpenEvent, DataChannel
+from flet.data_channel import DataChannel, DataChannelOpenEvent
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["Terminal"]
 
@@ -14,35 +18,35 @@ class Terminal(ft.LayoutControl):
     Provides full xterm.js feature parity across Windows, Linux, macOS, Android, and Web.
     """
 
-    scrollback: Optional[int] = 10000
-    font_family: Optional[str] = "JetBrains Mono"
-    font_size: Optional[float] = 11.0
-    cursor_blink: Optional[bool] = True
-    cursor_style: Optional[str] = "block"  # "block", "underline", "bar"
-    theme: Optional[dict[str, Any]] = None
-    read_only: Optional[bool] = False
-    auto_focus: Optional[bool] = True
+    scrollback: int | None = 10000
+    font_family: str | None = "JetBrains Mono"
+    font_size: float | None = 11.0
+    cursor_blink: bool | None = True
+    cursor_style: str | None = "block"  # "block", "underline", "bar"
+    theme: dict[str, Any] | None = None
+    read_only: bool | None = False
+    auto_focus: bool | None = True
 
     # Sticky modifier key states (synced bidirectionally with Dart)
-    ctrl_active: Optional[bool] = False
-    alt_active: Optional[bool] = False
+    ctrl_active: bool | None = False
+    alt_active: bool | None = False
 
     # Standard Flet event handlers
-    on_data: Optional[ft.ControlEventHandler] = None
-    on_resize: Optional[ft.ControlEventHandler] = None
-    on_modifier_reset: Optional[ft.ControlEventHandler] = None
-    on_title_change: Optional[ft.ControlEventHandler] = None
-    on_bell: Optional[ft.ControlEventHandler] = None
-    on_selection_change: Optional[ft.ControlEventHandler] = None
-    on_copy: Optional[ft.ControlEventHandler] = None
-    on_mount: Optional[ft.ControlEventHandler] = None
+    on_data: ft.ControlEventHandler | None = None
+    on_resize: ft.ControlEventHandler | None = None
+    on_modifier_reset: ft.ControlEventHandler | None = None
+    on_title_change: ft.ControlEventHandler | None = None
+    on_bell: ft.ControlEventHandler | None = None
+    on_selection_change: ft.ControlEventHandler | None = None
+    on_copy: ft.ControlEventHandler | None = None
+    on_mount: ft.ControlEventHandler | None = None
 
     # Internal channel setup handler
-    on_data_channel_open: Optional[ft.EventHandler[DataChannelOpenEvent]] = None
+    on_data_channel_open: ft.EventHandler[DataChannelOpenEvent] | None = None
 
     def init(self):
         self._lock = threading.Lock()
-        self._channel: Optional[DataChannel] = None
+        self._channel: DataChannel | None = None
         self._on_bytes_handler = None
         if self.on_data_channel_open is None:
             self.on_data_channel_open = self._handle_data_channel_open
@@ -75,6 +79,7 @@ class Terminal(ft.LayoutControl):
                 else:
                     self.page.run_task(task_fn)
             except Exception:
+                logger.debug("Pending write deferred (run_task failed)", exc_info=True)
                 remaining.append((task_fn, args))
         if remaining:
             with self._lock:
@@ -107,6 +112,7 @@ class Terminal(ft.LayoutControl):
                 with self._lock:
                     self._pending_writes.append((self.send_bytes, (payload,)))
         except Exception:
+            logger.debug("send_bytes deferred (channel unavailable)", exc_info=True)
             with self._lock:
                 self._pending_writes.append((self.send_bytes, (payload,)))
 
@@ -125,7 +131,7 @@ class Terminal(ft.LayoutControl):
             try:
                 self._on_unmount_callback()
             except Exception:
-                pass
+                logger.exception("Terminal unmount callback raised")
 
     async def write_async(self, data: str | bytes):
         """Writes text or escape sequences to the terminal via DataChannel (fast path) or Flet method invocation."""
@@ -338,7 +344,7 @@ class Terminal(ft.LayoutControl):
             with self._lock:
                 self._pending_writes.append((self.select_all_async, None))
 
-    async def get_selection_async(self) -> Optional[str]:
+    async def get_selection_async(self) -> str | None:
         """Returns the currently selected text, or None when there is no
         selection or the control is not ready. Unlike the fire-and-forget
         methods above this is a request/response call, so it cannot be queued

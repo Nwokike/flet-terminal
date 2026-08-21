@@ -22,3 +22,4 @@ build/
 .DS_Store
 *.log
 wheels/
+pubspec.lock

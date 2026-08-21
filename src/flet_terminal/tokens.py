@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 __all__ = [
-    "SPACE_XS",
-    "SPACE_SM",
-    "SPACE_MD",
-    "BTN_HEIGHT",
     "BTN_FONT_SIZE",
+    "BTN_HEIGHT",
     "COLOR_ACTIVE_BG",
     "COLOR_ACTIVE_FG",
+    "COLOR_BORDER",
     "COLOR_INACTIVE_BG",
     "COLOR_INACTIVE_FG",
-    "COLOR_BORDER",
+    "SPACE_MD",
+    "SPACE_SM",
+    "SPACE_XS",
 ]
 
 # Spacing tokens

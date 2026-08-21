@@ -2,22 +2,29 @@
 
 from __future__ import annotations
 
-from typing import Callable
+import asyncio
+import logging
+from collections.abc import Callable
 
 import flet as ft
 
-from .frozen_support import thaw
+from .frozen_support import control_update, thaw
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["TerminalSearchBar"]
 
 
 class TerminalSearchBar(ft.Container):
-    """Search field with next/prev match stepping, match counter, and close.
+    """Search field with live as-you-type matching, next/prev stepping, match
+    counter, and close.
 
-    `on_search(query, start, direction)` drives the terminal search; the Dart
-    side reports results through `on_selection_change` JSON which the host
-    should forward via `report_result(found, count, index)` so the counter and
-    stepping offsets stay in sync.
+    Typing searches automatically (350 ms debounce); the up/down arrows step
+    through matches, and Enter repeats "next". `on_search(query, start,
+    direction)` drives the terminal search; the Dart side reports results
+    through `on_selection_change` JSON which the host should forward via
+    `report_result(found, count, index)` so the counter and stepping offsets
+    stay in sync.
     """
 
     def __init__(
@@ -29,6 +36,8 @@ class TerminalSearchBar(ft.Container):
         self._on_close = on_close
         self._last_index = -1
         self._count = 0
+        self._last_query: str | None = None
+        self._debounce_gen = 0
 
         self._search_field = ft.TextField(
             hint_text="Search buffer…",
@@ -38,6 +47,7 @@ class TerminalSearchBar(ft.Container):
             content_padding=ft.Padding.symmetric(horizontal=8, vertical=0),
             bgcolor="#1E1E2E",
             border_color="#45475A",
+            on_change=self._handle_text_change,
             on_submit=lambda e: self.do_search(direction="next"),
         )
         self._counter = ft.Text(
@@ -85,15 +95,41 @@ class TerminalSearchBar(ft.Container):
             padding=ft.Padding(2, 1, 2, 1),
         )
 
-    def do_search(self, direction: str = "next"):
-        q = self._search_field.value or ""
+    def _handle_text_change(self, e):
+        """Live search: re-run 350 ms after typing settles."""
+        query = (e.control.value or "").strip()
+        self._debounce_gen += 1
+        gen = self._debounce_gen
+        if not query:
+            return
+
+        async def _delayed_search():
+            await asyncio.sleep(0.35)
+            if gen != self._debounce_gen:
+                return  # superseded by a newer keystroke or closed
+            if not self.page:
+                return
+            self.do_search(direction="next", reset=True)
+
+        try:
+            self.page.run_task(_delayed_search)
+        except RuntimeError:
+            logger.debug("live search deferred (page unavailable)", exc_info=True)
+
+    def do_search(self, direction: str = "next", reset: bool = False):
+        q = (self._search_field.value or "").strip()
         if not q:
             return
-        if direction == "next":
+        if reset or q != self._last_query:
+            # Fresh query (or explicit reset): start from the top.
+            self._last_query = q
+            self._last_index = -1
+            start = 0
+        elif direction == "prev":
+            start = max(self._last_index, 0)
+        else:
             # Resume after the current match so repeated presses step forward.
             start = self._last_index + 1 if self._last_index >= 0 else 0
-        else:
-            start = self._last_index if self._last_index >= 0 else 0
         self._on_search(q, start, direction)
 
     def report_result(self, found: bool, count: int, index: int):
@@ -105,19 +141,17 @@ class TerminalSearchBar(ft.Container):
                 f"{count} found" if found and count > 0 else "No matches"
             )
             self._counter.visible = True
-        try:
-            if self.page:
-                with thaw(self):
-                    self.update()
-        except RuntimeError:
-            pass
+        with thaw(self):
+            control_update(self)
 
     def _handle_close(self):
+        self._debounce_gen += 1  # cancel any pending live search
         with thaw(self._search_field):
             self._search_field.value = ""
         with thaw(self._counter):
             self._counter.visible = False
         self._last_index = -1
         self._count = 0
+        self._last_query = None
         if self._on_close:
             self._on_close()

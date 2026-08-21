@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
 import flet as ft
 
-from .frozen_support import thaw
+from .frozen_support import control_update, thaw
 from .tokens import (
     BTN_FONT_SIZE,
     BTN_HEIGHT,
@@ -17,6 +18,8 @@ from .tokens import (
     COLOR_INACTIVE_FG,
     SPACE_XS,
 )
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["DEFAULT_EXTRA_KEYS", "ExtraKeysBar"]
 
@@ -314,15 +317,7 @@ class ExtraKeysBar(ft.Container):
         if hasattr(self, "_settings_menu") and self._settings_menu:
             with thaw(self._settings_menu):
                 self._settings_menu.items = self._get_settings_menu_items()
-            try:
-                if self._settings_menu.page:
-                    with thaw(self._settings_menu):
-                        self._settings_menu.update()
-                elif self.page:
-                    with thaw(self):
-                        self.update()
-            except RuntimeError:
-                pass
+                control_update(self._settings_menu)
 
     def _make_key_btn(self, label: str, payload: bytes | None) -> ft.Control:
         if payload is None:
@@ -398,4 +393,4 @@ class ExtraKeysBar(ft.Container):
             self.content = (
                 self._collapsed_view if self._collapsed else self._expanded_row
             )
-            self.update()
+            control_update(self)

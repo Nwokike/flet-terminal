@@ -26,8 +26,13 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   DataChannel? _channel;
   StreamSubscription<Uint8List>? _channelSub;
   Timer? _blinkTimer;
+  Timer? _selectionDebounce;
   bool _blinkOn = true;
   bool? _syncedBlink;
+  // Sticky-bottom: while the user is at (or near) the bottom we follow new
+  // output; once they scroll up — e.g. to highlight text further up — every
+  // rebuild stops yanking the view back down.
+  bool _pinnedToBottom = true;
 
   @override
   void initState() {
@@ -38,6 +43,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     final maxLines = widget.control.getInt("scrollback", 10000)!;
     _terminal = qt.Terminal(maxLines: maxLines);
     _syncBlink(widget.control.getBool("cursor_blink", true)!);
+    _scrollController.addListener(_updatePinned);
 
     // Surface real user selections (long-press word select, drag select) to
     // Python. Previously selection_change only fired from the search method.
@@ -117,6 +123,14 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
       _channelSub = ch.messages.listen((bytes) {
         if (mounted) {
           _terminal.write(utf8.decode(bytes, allowMalformed: true));
+          // Follow new output only while the user is pinned to the bottom.
+          if (_pinnedToBottom) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && _pinnedToBottom) {
+                _scrollToBottom();
+              }
+            });
+          }
         }
       });
 
@@ -130,15 +144,33 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   }
 
   void _onSelectionChanged() {
-    final selection = _terminalController.selection;
-    final hasSelection = selection != null;
-    widget.control.triggerEvent(
-      "selection_change",
-      jsonEncode({
-        "has_selection": hasSelection,
-        "text": hasSelection ? _terminal.buffer.getText(selection) : "",
-      }),
-    );
+    // Debounce: drag-select fires a controller notification per pixel moved;
+    // forwarding each one to Python floods the bridge and re-renders the
+    // host panel mid-drag. One event per 150 ms of quiet is plenty for both
+    // the search counter and copy flows.
+    _selectionDebounce?.cancel();
+    _selectionDebounce = Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      final selection = _terminalController.selection;
+      final hasSelection = selection != null;
+      widget.control.triggerEvent(
+        "selection_change",
+        jsonEncode({
+          "has_selection": hasSelection,
+          "text": hasSelection ? _terminal.buffer.getText(selection) : "",
+        }),
+      );
+    });
+  }
+
+  /// Tracks whether the user is still at the bottom of the scrollback.
+  /// Called on every scroll offset change; anything beyond a small epsilon
+  /// above the max extent means they scrolled up deliberately.
+  void _updatePinned() {
+    if (_scrollController.hasClients) {
+      final pos = _scrollController.position;
+      _pinnedToBottom = pos.pixels >= pos.maxScrollExtent - 40;
+    }
   }
 
   Future<dynamic> _handleMethodCall(String name, dynamic args) async {
@@ -417,9 +449,17 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
 
             Widget currentView = termView;
             if (bottomInset > 0) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _scrollToBottom();
-              });
+              // Only snap to the bottom when the user hasn't deliberately
+              // scrolled up (e.g. while highlighting text). Previously this
+              // fired on every rebuild with the keyboard open, which made
+              // scrollback unreachable during selection.
+              if (_pinnedToBottom) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && _pinnedToBottom) {
+                    _scrollToBottom();
+                  }
+                });
+              }
               if (constraints.maxHeight.isInfinite || constraints.maxHeight + bottomInset >= media.size.height - 80.0) {
                 currentView = Padding(
                   padding: EdgeInsets.only(bottom: bottomInset),
@@ -477,8 +517,11 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   void dispose() {
     _blinkTimer?.cancel();
     _blinkTimer = null;
+    _selectionDebounce?.cancel();
+    _selectionDebounce = null;
     widget.control.removeInvokeMethodListener(_handleMethodCall);
     _terminalController.removeListener(_onSelectionChanged);
+    _scrollController.removeListener(_updatePinned);
     _channelSub?.cancel();
     _channel?.close();
     _focusNode.dispose();

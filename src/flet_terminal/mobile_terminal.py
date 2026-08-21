@@ -1,13 +1,20 @@
 """MobileTerminal — composite responsive control combining Terminal, virtual keyboard bar, and search."""
 
 from __future__ import annotations
-from typing import Any, Callable
+
+import logging
+from collections.abc import Callable
+from typing import Any
+
 import flet as ft
-from .terminal import Terminal
-from .extra_keys import ExtraKeysBar, DEFAULT_EXTRA_KEYS
-from .frozen_support import thaw
+
+from .extra_keys import DEFAULT_EXTRA_KEYS, ExtraKeysBar
+from .frozen_support import control_update, thaw
 from .search_bar import TerminalSearchBar
-from .themes import get_theme, BUILTIN_THEMES
+from .terminal import Terminal
+from .themes import BUILTIN_THEMES, get_theme
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["MobileTerminal"]
 
@@ -114,7 +121,7 @@ class MobileTerminal(ft.Column):
                         int(data.get("index", -1)),
                     )
             except Exception:
-                pass
+                logger.debug("selection_change parse failed", exc_info=True)
         if self._user_on_selection_change:
             self._user_on_selection_change(e)
 
@@ -122,12 +129,7 @@ class MobileTerminal(ft.Column):
         with thaw(self._terminal):
             self._terminal.ctrl_active = ctrl
             self._terminal.alt_active = alt
-        try:
-            if self._terminal.page:
-                with thaw(self._terminal):
-                    self._terminal.update()
-        except RuntimeError:
-            pass
+            control_update(self._terminal)
 
     @property
     def show_search(self) -> bool:
@@ -138,18 +140,10 @@ class MobileTerminal(ft.Column):
         bar = self._search_bar
         with thaw(bar):
             bar.visible = bool(val)
+            control_update(bar)
         if self._keys_bar:
             self._keys_bar.active_search = bool(val)
             self._keys_bar.update_settings_menu()
-        try:
-            # In declarative Flet 0.86 the wrapper's update() is swallowed
-            # (component-mode diff ignores it). Pushing the diff of the
-            # bar itself is what actually emits a "visible" op.
-            if bar.page:
-                with thaw(bar):
-                    bar.update()
-        except RuntimeError:
-            pass
 
     def toggle_search(self):
         """Toggle visibility of the search bar."""
@@ -164,12 +158,7 @@ class MobileTerminal(ft.Column):
         if preset:
             with thaw(self._terminal):
                 self._terminal.theme = preset
-            try:
-                if self._terminal.page:
-                    with thaw(self._terminal):
-                        self._terminal.update()
-            except RuntimeError:
-                pass
+                control_update(self._terminal)
             if self._keys_bar:
                 self._keys_bar.active_theme = theme_name
                 self._keys_bar.update_settings_menu()
@@ -178,12 +167,7 @@ class MobileTerminal(ft.Column):
         """Set cursor shape ('block', 'underline', 'bar')."""
         with thaw(self._terminal):
             self._terminal.cursor_style = style
-        try:
-            if self._terminal.page:
-                with thaw(self._terminal):
-                    self._terminal.update()
-        except RuntimeError:
-            pass
+            control_update(self._terminal)
         if self._keys_bar:
             self._keys_bar.active_cursor = style
             self._keys_bar.update_settings_menu()
@@ -192,12 +176,7 @@ class MobileTerminal(ft.Column):
         """Toggle blinking animation for the cursor."""
         with thaw(self._terminal):
             self._terminal.cursor_blink = not self._terminal.cursor_blink
-        try:
-            if self._terminal.page:
-                with thaw(self._terminal):
-                    self._terminal.update()
-        except RuntimeError:
-            pass
+            control_update(self._terminal)
         if self._keys_bar:
             self._keys_bar.active_blink = self._terminal.cursor_blink
             self._keys_bar.update_settings_menu()
@@ -208,12 +187,7 @@ class MobileTerminal(ft.Column):
         new_size = current + step
         with thaw(self._terminal):
             self._terminal.font_size = new_size
-        try:
-            if self._terminal.page:
-                with thaw(self._terminal):
-                    self._terminal.update()
-        except RuntimeError:
-            pass
+            control_update(self._terminal)
         if self._keys_bar:
             self._keys_bar.current_font_size = new_size
             self._keys_bar.update_settings_menu()
@@ -225,12 +199,7 @@ class MobileTerminal(ft.Column):
             new_size = max(6.0, current - step)
             with thaw(self._terminal):
                 self._terminal.font_size = new_size
-            try:
-                if self._terminal.page:
-                    with thaw(self._terminal):
-                        self._terminal.update()
-            except RuntimeError:
-                pass
+                control_update(self._terminal)
             if self._keys_bar:
                 self._keys_bar.current_font_size = new_size
                 self._keys_bar.update_settings_menu()
@@ -239,12 +208,7 @@ class MobileTerminal(ft.Column):
         """Reset terminal font size to original default."""
         with thaw(self._terminal):
             self._terminal.font_size = self._default_font_size
-        try:
-            if self._terminal.page:
-                with thaw(self._terminal):
-                    self._terminal.update()
-        except RuntimeError:
-            pass
+            control_update(self._terminal)
         if self._keys_bar:
             self._keys_bar.current_font_size = self._default_font_size
             self._keys_bar.update_settings_menu()
@@ -259,6 +223,7 @@ class MobileTerminal(ft.Column):
     def ctrl_active(self, val: bool):
         with thaw(self._terminal):
             self._terminal.ctrl_active = val
+            control_update(self._terminal)
         if self._keys_bar:
             self._keys_bar.ctrl_active = val
             self._keys_bar.refresh_buttons()
@@ -271,6 +236,7 @@ class MobileTerminal(ft.Column):
     def alt_active(self, val: bool):
         with thaw(self._terminal):
             self._terminal.alt_active = val
+            control_update(self._terminal)
         if self._keys_bar:
             self._keys_bar.alt_active = val
             self._keys_bar.refresh_buttons()
@@ -339,12 +305,13 @@ class MobileTerminal(ft.Column):
         try:
             await ft.Clipboard().set(text)
         except Exception:
+            logger.exception("Clipboard set failed")
             return False
         self._terminal.clear_selection()
         try:
             await self._terminal._trigger_event("copy", text)
         except Exception:
-            pass
+            logger.debug("copy event dispatch failed", exc_info=True)
         return True
 
     def copy_selection(self):
@@ -354,7 +321,7 @@ class MobileTerminal(ft.Column):
                 return
             self.page.run_task(self.copy_selection_async)
         except RuntimeError:
-            pass
+            logger.debug("copy_selection deferred (page unavailable)", exc_info=True)
 
     async def paste_async(self):
         await self._terminal.paste_async()
