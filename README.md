@@ -181,6 +181,24 @@ Reactivity is unaffected — `Component.update()` creates its own renderer on ev
 | `on_title_change` | `Callable[[ft.ControlEvent], None]` | Triggered when OSC 0/2 title escape sequences are received. |
 | `on_bell` | `Callable[[ft.ControlEvent], None]` | Triggered when the bell character (`\a` / `0x07`) is received. |
 | `on_selection_change` | `Callable[[ft.ControlEvent], None]` | Fired when selection or search matches update. |
+| `on_shortcut` | `Callable[[ShortcutEvent], None]` | Fired when a built-in host shortcut is pressed while the terminal has focus. The combo is consumed on the Dart side — it never reaches the PTY. `e.shortcut` carries the machine name. Active only when a handler is set. |
+
+#### Built-in shortcuts (`on_shortcut`)
+
+| Combination | `e.shortcut` value |
+| :--- | :--- |
+| `Ctrl/Cmd+Shift+T` | `new_terminal` |
+| `Ctrl/Cmd+Shift+W` | `close_terminal` |
+| `Ctrl/Cmd+Shift+1` … `+9` | `switch_terminal_1` … `switch_terminal_9` |
+| `Ctrl/Cmd+Shift+F` | `toggle_search` |
+| `Ctrl/Cmd+Shift+L` | `clear` |
+| `Ctrl/Cmd+Shift+C` | `copy` |
+| `Ctrl/Cmd+Shift+V` | `paste` |
+| `Ctrl/Cmd+Shift+=` | `zoom_in` |
+| `Ctrl/Cmd+Shift+-` | `zoom_out` |
+| `Ctrl/Cmd+Shift+0` | `zoom_reset` |
+| `Ctrl/Cmd+PageUp` / `PageDown` | `prev_terminal` / `next_terminal` |
+| `F1` | `help` |
 
 ### `MobileTerminal` Additional Methods & Properties
 

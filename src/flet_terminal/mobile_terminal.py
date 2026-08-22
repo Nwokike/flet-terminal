@@ -393,3 +393,12 @@ class MobileTerminal(ft.Column):
     def on_copy(self, val):
         with thaw(self._terminal):
             self._terminal.on_copy = val
+
+    @property
+    def on_shortcut(self):
+        return self._terminal.on_shortcut
+
+    @on_shortcut.setter
+    def on_shortcut(self, val):
+        with thaw(self._terminal):
+            self._terminal.on_shortcut = val

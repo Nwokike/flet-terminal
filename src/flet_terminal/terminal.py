@@ -1,5 +1,6 @@
 import logging
 import threading
+from dataclasses import dataclass
 from typing import Any
 
 import flet as ft
@@ -8,7 +9,18 @@ from flet.data_channel import DataChannel, DataChannelOpenEvent
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["Terminal"]
+__all__ = ["ShortcutEvent", "Terminal"]
+
+
+@dataclass
+class ShortcutEvent(ft.Event["Terminal"]):
+    """Fired when a built-in terminal keyboard shortcut is consumed on the
+    Dart side. The key combination never reaches the PTY — returning
+    ``handled`` from xterm's ``onKeyEvent`` swallows it before input
+    processing. Enabled only when ``on_shortcut`` is set."""
+
+    shortcut: str = ""
+    """Machine name of the shortcut, e.g. ``"new_terminal"``."""
 
 
 @control("FletTerminal")
@@ -40,6 +52,7 @@ class Terminal(ft.LayoutControl):
     on_selection_change: ft.ControlEventHandler | None = None
     on_copy: ft.ControlEventHandler | None = None
     on_mount: ft.ControlEventHandler | None = None
+    on_shortcut: ft.EventHandler[ShortcutEvent] | None = None
 
     # Internal channel setup handler
     on_data_channel_open: ft.EventHandler[DataChannelOpenEvent] | None = None

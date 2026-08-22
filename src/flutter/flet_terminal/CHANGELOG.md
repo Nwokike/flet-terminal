@@ -1,3 +1,9 @@
+# 0.3.8
+
+- **Host keyboard shortcuts, leak-free.** `Terminal`/`MobileTerminal` gain an `on_shortcut` event. Built-in combos are consumed on the Dart side via xterm's `onKeyEvent` hook — the highest-priority stage of xterm's key pipeline — so they never reach the PTY. Enabled only when `on_shortcut` is set; without a handler all keys flow to the terminal untouched.
+- Combo set: `Ctrl/Cmd+Shift+T` (new_terminal), `+W` (close_terminal), `+1..9` (switch_terminal_N), `+F` (toggle_search), `+L` (clear), `+C` (copy), `+V` (paste), `+=` (zoom_in), `+-` (zoom_out), `+0` (zoom_reset), `Ctrl/Cmd+PageUp/PageDown` (prev/next_terminal), `F1` (help).
+- New `ShortcutEvent` payload (`.shortcut` carries the machine name) exported from the package root.
+
 # 0.2.2
 
 - Updated default font size from 13px to 11px.

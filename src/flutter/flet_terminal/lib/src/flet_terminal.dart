@@ -34,6 +34,62 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   // rebuild stops yanking the view back down.
   bool _pinnedToBottom = true;
 
+  // Host-level shortcuts consumed BEFORE xterm's input handler, so the key
+  // combination never reaches the PTY. TerminalView.onKeyEvent has the
+  // highest priority in xterm's key pipeline (it runs before the shortcut
+  // manager and the terminal's own input handling); returning
+  // KeyEventResult.handled swallows the event entirely.
+  static const Map<LogicalKeyboardKey, String> _ctrlShiftShortcuts = {
+    LogicalKeyboardKey.keyT: "new_terminal",
+    LogicalKeyboardKey.keyW: "close_terminal",
+    LogicalKeyboardKey.keyF: "toggle_search",
+    LogicalKeyboardKey.keyL: "clear",
+    LogicalKeyboardKey.keyC: "copy",
+    LogicalKeyboardKey.keyV: "paste",
+    LogicalKeyboardKey.equal: "zoom_in",
+    LogicalKeyboardKey.minus: "zoom_out",
+    LogicalKeyboardKey.digit0: "zoom_reset",
+    LogicalKeyboardKey.digit1: "switch_terminal_1",
+    LogicalKeyboardKey.digit2: "switch_terminal_2",
+    LogicalKeyboardKey.digit3: "switch_terminal_3",
+    LogicalKeyboardKey.digit4: "switch_terminal_4",
+    LogicalKeyboardKey.digit5: "switch_terminal_5",
+    LogicalKeyboardKey.digit6: "switch_terminal_6",
+    LogicalKeyboardKey.digit7: "switch_terminal_7",
+    LogicalKeyboardKey.digit8: "switch_terminal_8",
+    LogicalKeyboardKey.digit9: "switch_terminal_9",
+  };
+
+  KeyEventResult? _handleShortcutKey(FocusNode node, KeyEvent event) {
+    // Only react to the initial press; repeats and releases flow through
+    // untouched so held keys keep typing.
+    if (event is! KeyDownEvent) return null;
+    // Consume host shortcuts only when the Python side listens for them —
+    // otherwise a Terminal without an on_shortcut handler would silently
+    // swallow standard terminal key combos.
+    if (!widget.control.hasEventHandler("shortcut")) return null;
+
+    final kb = HardwareKeyboard.instance;
+    final ctrl = kb.isControlPressed || kb.isMetaPressed;
+    final shift = kb.isShiftPressed;
+    final key = event.logicalKey;
+
+    String? name;
+    if (key == LogicalKeyboardKey.f1 && !ctrl && !shift && !kb.isAltPressed) {
+      name = "help";
+    } else if (ctrl && !shift &&
+        (key == LogicalKeyboardKey.pageUp || key == LogicalKeyboardKey.pageDown)) {
+      name = key == LogicalKeyboardKey.pageUp ? "prev_terminal" : "next_terminal";
+    } else if (ctrl && shift) {
+      name = _ctrlShiftShortcuts[key];
+    }
+    if (name == null) return null;
+
+    widget.control.triggerEvent("shortcut", {"shortcut": name});
+    return KeyEventResult.handled;
+  }
+
+
   @override
   void initState() {
     super.initState();
@@ -410,6 +466,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
       alwaysShowCursor: false,
       deleteDetection: isMobile,
       keyboardType: TextInputType.text,
+      onKeyEvent: _handleShortcutKey,
       onSecondaryTapUp: (details, offset) async {
         if (_terminalController.selection != null) {
           final selectedText = _terminal.buffer.getText(_terminalController.selection!);
