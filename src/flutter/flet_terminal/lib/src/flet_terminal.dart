@@ -39,7 +39,8 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
   // highest priority in xterm's key pipeline (it runs before the shortcut
   // manager and the terminal's own input handling); returning
   // KeyEventResult.handled swallows the event entirely.
-  static const Map<LogicalKeyboardKey, String> _ctrlShiftShortcuts = {
+  static final Map<LogicalKeyboardKey, String> _ctrlShiftShortcuts =
+      <LogicalKeyboardKey, String>{
     LogicalKeyboardKey.keyT: "new_terminal",
     LogicalKeyboardKey.keyW: "close_terminal",
     LogicalKeyboardKey.keyF: "toggle_search",
@@ -60,14 +61,17 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     LogicalKeyboardKey.digit9: "switch_terminal_9",
   };
 
-  KeyEventResult? _handleShortcutKey(FocusNode node, KeyEvent event) {
+  KeyEventResult _handleShortcutKey(FocusNode node, KeyEvent event) {
     // Only react to the initial press; repeats and releases flow through
-    // untouched so held keys keep typing.
-    if (event is! KeyDownEvent) return null;
+    // untouched so held keys keep typing. Returning `ignored` lets xterm
+    // process the key exactly as if this hook did not exist.
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
     // Consume host shortcuts only when the Python side listens for them —
     // otherwise a Terminal without an on_shortcut handler would silently
     // swallow standard terminal key combos.
-    if (!widget.control.hasEventHandler("shortcut")) return null;
+    if (!widget.control.hasEventHandler("shortcut")) {
+      return KeyEventResult.ignored;
+    }
 
     final kb = HardwareKeyboard.instance;
     final ctrl = kb.isControlPressed || kb.isMetaPressed;
@@ -83,7 +87,7 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
     } else if (ctrl && shift) {
       name = _ctrlShiftShortcuts[key];
     }
-    if (name == null) return null;
+    if (name == null) return KeyEventResult.ignored;
 
     widget.control.triggerEvent("shortcut", {"shortcut": name});
     return KeyEventResult.handled;
