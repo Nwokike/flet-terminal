@@ -1,10 +1,31 @@
-# flet-terminal
+<p align="center">
+  <a href="https://github.com/Nwokike/flet-terminal" target="_blank">
+    <img src="https://raw.githubusercontent.com/flet-dev/flet/refs/heads/main/media/logo/flet-logo.svg" height="150" alt="Flet Terminal logo">
+  </a>
+</p>
+
+<h1 align="center">Flet Terminal</h1>
 
 <p align="center">
-  <a href="https://github.com/Nwokike/flet-terminal/releases/latest"><img src="https://img.shields.io/badge/Download-Flet%20Terminal-orange?style=for-the-badge&logo=github&logoColor=white" alt="Download Flet Terminal" /></a>
-  <a href="https://pypi.org/project/flet-terminal/"><img src="https://img.shields.io/pypi/v/flet-terminal?style=for-the-badge&logo=pypi&logoColor=white" alt="PyPI" /></a>
-  <img src="https://img.shields.io/badge/Built%20with-Flet%200.86-00B0FF?style=for-the-badge&logo=flutter&logoColor=white" alt="Flet" />
+  <em>A GPU-accelerated native terminal control for Flet apps, powered by xterm.dart.</em>
 </p>
+
+<p align="center">
+  <a href="https://pypi.org/project/flet-terminal/" target="_blank">
+    <img src="https://img.shields.io/pypi/v/flet-terminal?color=%2334D058&label=PyPI" alt="PyPI version" />
+  </a>
+  <a href="https://pepy.tech/projects/flet-terminal" target="_blank">
+    <img src="https://static.pepy.tech/personalized-badge/flet-terminal?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=Users" alt="Total users" />
+  </a>
+  <a href="https://github.com/Nwokike/flet-terminal/actions/workflows/build-all.yml" target="_blank">
+    <img src="https://github.com/Nwokike/flet-terminal/actions/workflows/build-all.yml/badge.svg" alt="CI status" />
+  </a>
+  <a href="https://pypi.org/project/flet-terminal/" target="_blank">
+    <img src="https://img.shields.io/badge/python-%3E%3D3.14-%2334D058" alt="Python >= 3.14" />
+  </a>
+</p>
+
+---
 
 A native, GPU-accelerated terminal control for [Flet](https://flet.dev/), built on top of [xterm.dart](https://github.com/PangolinDesktop/xterm.dart).
 
@@ -14,23 +35,12 @@ Fully compatible with Flet 0.86's **declarative component model** (`@ft.componen
 
 ---
 
-## Download Flet Terminal
-
-Try the standalone **Flet Terminal** desktop application directly on your OS:
-
-| Platform | Download | Notes |
-| :---: | :---: | :--- |
-| 🪟 **Windows (x64)** | [**FletTerminal_windows_x64.zip**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminal_windows_x64.zip) | Portable Windows executable (`.exe`) |
-| 🐧 **Linux (x86_64)** | [**FletTerminal_linux_x86_64.tar.gz**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminal_linux_x86_64.tar.gz) | Universal Linux tarball (`tar -xzf`) |
-| 📦 **All Releases** | [**View Releases Page**](https://github.com/Nwokike/flet-terminal/releases/latest) | Changelog and release notes |
-
----
-
 ## Features
 
 - **High-Throughput Binary Streaming**: Routes terminal data over Flet `DataChannel` directly to the `xterm.dart` canvas, bypassing string/MsgPack serialization overhead.
 - **Cross-Platform Compatibility**: Full feature parity across Desktop (`pty` / `winpty`), Mobile (`Android`), and Web (`WASM` / `Pyodide`).
 - **Declarative-First Design**: Built for Flet 0.86's React-like component model. All internal mutations use `thaw()` to safely update frozen controls inside declarative trees.
+- **Leak-Free Host Shortcuts**: Built-in combos (`Ctrl/Cmd+Shift+T/W/1-9/F/L/C/V`, zoom, `F1`) are intercepted on the Dart side *before* the PTY — they fire an `on_shortcut` event and never leak bytes into your shell.
 - **Responsive Mobile Wrapper & Zoom Controls**: `MobileTerminal` includes `zoom_in()`, `zoom_out()`, `reset_zoom()`, and a customizable virtual accessory keyboard (`ESC`, `TAB`, `CTRL`, `ALT`, arrows) with sticky modifier toggles and collapsible state.
 - **Reactive CTRL/ALT Modifiers**: Sticky modifier buttons are `@ft.component` instances subscribed to an `@ft.observable` `ModifierState` — they repaint instantly on toggle, reset, or external state change.
 - **Real Cursor Blink**: A Dart-side `Timer.periodic` toggles `cursorVisibleMode` + `notifyListeners()` for true blink (upstream xterm 4.0.0 has no built-in blink).
@@ -189,7 +199,7 @@ Reactivity is unaffected — `Component.update()` creates its own renderer on ev
 | :--- | :--- |
 | `Ctrl/Cmd+Shift+T` | `new_terminal` |
 | `Ctrl/Cmd+Shift+W` | `close_terminal` |
-| `Ctrl/Cmd+Shift+1` … `+9` | `switch_terminal_1` … `switch_terminal_9` |
+| `Ctrl/Cmd+Shift+1 .. 9` | `switch_terminal_1` .. `switch_terminal_9` |
 | `Ctrl/Cmd+Shift+F` | `toggle_search` |
 | `Ctrl/Cmd+Shift+L` | `clear` |
 | `Ctrl/Cmd+Shift+C` | `copy` |
@@ -255,6 +265,18 @@ my_theme = get_theme("Dracula")
 | **JetBrains Dark** | `#1E1E2E` | `#F5E0DC` (warm white) | Dark mode (Catppuccin-inspired) |
 | **Matrix Green** | `#0D1117` | `#00FF66` (green) | Retro / hacker aesthetic |
 | **Colab Light** | `#FFFFFF` | `#F97316` (orange) | Light mode / follows app theme |
+
+---
+
+## Desktop Demo App
+
+Try the standalone **Flet Terminal** demo application directly on your OS:
+
+| Platform | Download | Notes |
+| :---: | :---: | :--- |
+| 🪟 **Windows (x64)** | [**FletTerminal_windows_x64.zip**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminal_windows_x64.zip) | Portable Windows executable (`.exe`) |
+| 🐧 **Linux (x86_64)** | [**FletTerminal_linux_x86_64.tar.gz**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminal_linux_x86_64.tar.gz) | Universal Linux tarball (`tar -xzf`) |
+| 📦 **All Releases** | [**View Releases Page**](https://github.com/Nwokike/flet-terminal/releases/latest) | Changelog and release notes |
 
 ---
 
