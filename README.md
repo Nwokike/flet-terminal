@@ -4,7 +4,7 @@
   </a>
 </p>
 
-<h1 align="center">Flet Terminal</h1>
+<h1 align="center">Terminal</h1>
 
 <p align="center">
   <em>A GPU-accelerated native terminal control for Flet apps, powered by xterm.dart.</em>
@@ -16,9 +16,6 @@
   </a>
   <a href="https://pepy.tech/projects/flet-terminal" target="_blank">
     <img src="https://static.pepy.tech/personalized-badge/flet-terminal?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=Users" alt="Total users" />
-  </a>
-  <a href="https://github.com/Nwokike/flet-terminal/actions/workflows/build-all.yml" target="_blank">
-    <img src="https://github.com/Nwokike/flet-terminal/actions/workflows/build-all.yml/badge.svg" alt="CI status" />
   </a>
   <a href="https://pypi.org/project/flet-terminal/" target="_blank">
     <img src="https://img.shields.io/badge/python-%3E%3D3.14-%2334D058" alt="Python >= 3.14" />
