@@ -1,3 +1,4 @@
+import inspect
 import logging
 import threading
 from dataclasses import dataclass
@@ -87,12 +88,15 @@ class Terminal(ft.LayoutControl):
                 remaining.append((task_fn, args))
                 continue
             try:
-                if args is not None:
-                    self.page.run_task(task_fn, *args)
+                arg_list = args if args is not None else ()
+                if inspect.iscoroutinefunction(task_fn):
+                    self.page.run_task(task_fn, *arg_list)
                 else:
-                    self.page.run_task(task_fn)
+                    # Flet 1.0's run_task rejects sync callables with
+                    # TypeError, which used to re-queue this write forever.
+                    task_fn(*arg_list)
             except Exception:
-                logger.debug("Pending write deferred (run_task failed)", exc_info=True)
+                logger.debug("Pending write deferred (flush failed)", exc_info=True)
                 remaining.append((task_fn, args))
         if remaining:
             with self._lock:

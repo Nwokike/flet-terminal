@@ -63,6 +63,7 @@ class MobileTerminal(ft.Column):
         )
         self._search_bar.visible = bool(show_search)
         self._user_on_selection_change = None
+        self._clipboard: ft.Clipboard | None = None
         # Route search results into the bar's match counter while still
         # forwarding the event to any user-supplied handler.
         self._terminal.on_selection_change = self._internal_on_selection_change
@@ -303,7 +304,11 @@ class MobileTerminal(ft.Column):
         if not text:
             return False
         try:
-            await ft.Clipboard().set(text)
+            if self._clipboard is None:
+                # One shared service: every Clipboard() construct would
+                # auto-register another instance on the page (Flet 1.0).
+                self._clipboard = ft.Clipboard()
+            await self._clipboard.set(text)
         except Exception:
             logger.exception("Clipboard set failed")
             return False
@@ -384,6 +389,41 @@ class MobileTerminal(ft.Column):
                 self._terminal.on_selection_change = self._internal_on_selection_change
             else:
                 self._terminal.on_selection_change = val
+
+    @property
+    def on_mount(self):
+        """Fired whenever the Dart xterm view is (re)created (tab switches,
+        remounts). Register via assignment: ``mt.on_mount = handler``."""
+        return self._terminal.on_mount
+
+    @on_mount.setter
+    def on_mount(self, val):
+        with thaw(self._terminal):
+            self._terminal.on_mount = val
+
+    @property
+    def ready(self) -> bool:
+        """True once the Dart view and pty data channel accept writes."""
+        return bool(self._terminal._dart_ready and self._terminal._channel_ready)
+
+    @property
+    def pending_count(self) -> int:
+        """Writes queued while the data channel was unavailable."""
+        with self._terminal._lock:
+            return len(self._terminal._pending_writes)
+
+    def clear_pending(self) -> None:
+        """Drop queued writes that never reached the data channel."""
+        with self._terminal._lock:
+            self._terminal._pending_writes.clear()
+
+    def flush(self) -> None:
+        """Re-run the pending-write queue (idempotent; safe anywhere)."""
+        self._terminal._mark_dart_ready()
+
+    def set_on_unmount(self, callback) -> None:
+        """Register a callback fired when the Dart xterm view is torn down."""
+        self._terminal._on_unmount_callback = callback
 
     @property
     def on_copy(self):

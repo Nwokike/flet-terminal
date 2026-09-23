@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 __all__ = ["DEFAULT_EXTRA_KEYS", "ExtraKeysBar"]
 
 
-# Reactive modifier state. Flet 0.86's declarative model only repaints a control
+# Reactive modifier state. Flet 1.0's declarative model only repaints a control
 # when its owning @ft.component re-renders (it diffs the previous render tree
 # against the new one). Mutating `style` + `update()` is a no-op there, so the
 # CTRL/ALT "light" is driven by this observable: the buttons subscribe to it and

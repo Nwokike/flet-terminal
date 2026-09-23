@@ -1,4 +1,4 @@
-"""App — the declarative Flet 0.86 root component for the FletTerminal demo.
+"""App — the declarative Flet 1.0 root component for the FletTerminal demo.
 
 `DemoState` is an @ft.observable model; the terminal and PTY service are
 created once per mount (use_state factory) and torn down on unmount.
@@ -65,7 +65,11 @@ def _make_bundle(page: ft.Page):
     pty = PTYService(
         on_output=mt.send_bytes,
         on_error=lambda msg: page.show_dialog(
-            ft.SnackBar(ft.Text(f"⚠️ {msg}"), bgcolor="#F38BA8", duration=2500)
+            ft.SnackBar(
+                ft.Text(f"⚠️ {msg}"),
+                bgcolor="#F38BA8",
+                duration=ft.Duration(milliseconds=2500),
+            )
         ),
     )
     mt.set_on_bytes(pty.write)

@@ -28,7 +28,7 @@ A native, GPU-accelerated terminal control for [Flet](https://flet.dev/), built 
 
 `flet-terminal` provides high-performance VT100/ANSI terminal emulation across **Windows, Linux, macOS, Android, and Web**, utilizing low-latency binary `DataChannel` streaming to render thousands of lines per second without UI freezing.
 
-Fully compatible with Flet 0.86's **declarative component model** (`@ft.component`, `@ft.observable`, `use_state`, `use_effect`) — including frozen-control safety via the built-in `thaw()` context manager.
+Fully compatible with Flet 1.0's **declarative component model** (`@ft.component`, `@ft.observable`, `use_state`, `use_effect`) — including frozen-control safety via the built-in `thaw()` context manager.
 
 ---
 
@@ -36,7 +36,7 @@ Fully compatible with Flet 0.86's **declarative component model** (`@ft.componen
 
 - **High-Throughput Binary Streaming**: Routes terminal data over Flet `DataChannel` directly to the `xterm.dart` canvas, bypassing string/MsgPack serialization overhead.
 - **Cross-Platform Compatibility**: Full feature parity across Desktop (`pty` / `winpty`), Mobile (`Android`), and Web (`WASM` / `Pyodide`).
-- **Declarative-First Design**: Built for Flet 0.86's React-like component model. All internal mutations use `thaw()` to safely update frozen controls inside declarative trees.
+- **Declarative-First Design**: Built for Flet 1.0's React-like component model. All internal mutations use `thaw()` to safely update frozen controls inside declarative trees.
 - **Leak-Free Host Shortcuts**: Built-in combos (`Ctrl/Cmd+Shift+T/W/1-9/F/L/C/V`, zoom, `F1`) are intercepted on the Dart side *before* the PTY — they fire an `on_shortcut` event and never leak bytes into your shell.
 - **Responsive Mobile Wrapper & Zoom Controls**: `MobileTerminal` includes `zoom_in()`, `zoom_out()`, `reset_zoom()`, and a customizable virtual accessory keyboard (`ESC`, `TAB`, `CTRL`, `ALT`, arrows) with sticky modifier toggles and collapsible state.
 - **Reactive CTRL/ALT Modifiers**: Sticky modifier buttons are `@ft.component` instances subscribed to an `@ft.observable` `ModifierState` — they repaint instantly on toggle, reset, or external state change.
@@ -65,7 +65,7 @@ uv add flet-terminal
 
 ## Quickstart
 
-### 1. Declarative App (Recommended — Flet 0.86)
+### 1. Declarative App (Recommended — Flet 1.0)
 
 ```python
 import flet as ft
@@ -279,7 +279,7 @@ Try the standalone **Flet Terminal** demo application directly on your OS:
 
 ## Frozen-Control Support
 
-Flet 0.86's declarative renderer stamps `_frozen = True` on all component-rendered controls. Imperative mutations (`.update()`, property assignment) raise `RuntimeError: Frozen controls cannot be updated.`
+Flet 1.0's declarative renderer stamps `_frozen = True` on all component-rendered controls. Imperative mutations (`.update()`, property assignment) raise `RuntimeError: Frozen controls cannot be updated.`
 
 `flet_terminal` handles this internally via `thaw()`:
 

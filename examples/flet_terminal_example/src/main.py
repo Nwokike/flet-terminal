@@ -1,4 +1,4 @@
-"""Root Flet Terminal Application — declarative Flet 0.86 entry point.
+"""Root Flet Terminal Application — declarative Flet 1.0 entry point.
 
 The app is a single `@ft.component` tree rendered via `page.render(App)`;
 all UI state lives in the `DemoState` observable in `app.py`.

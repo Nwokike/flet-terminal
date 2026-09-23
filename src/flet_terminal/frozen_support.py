@@ -40,7 +40,7 @@ def thaw(control: Any) -> Iterator[None]:
 def _patch_page(control: Any):
     """Best-effort resolution of the Page that owns ``control``.
 
-    Flet 0.86's declarative reconciler drops the parent chain
+    Flet 1.0's declarative reconciler drops the parent chain
     (``_parent`` weakrefs) of every control whose subtree was replaced on
     re-render — visible toggles, lazy mounts, and tab switches all trigger it.
     ``Control.update()`` is dead in that moment because it resolves the page
