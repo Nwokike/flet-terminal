@@ -46,7 +46,7 @@ class TerminalSearchBar(ft.Container):
             expand=True,
             content_padding=ft.Padding.symmetric(horizontal=8, vertical=0),
             bgcolor="#1E1E2E",
-            border_color="#45475A",
+            border=ft.OutlineInputBorder(side=ft.BorderSide(color="#45475A")),
             on_change=self._handle_text_change,
             on_submit=lambda e: self.do_search(direction="next"),
         )

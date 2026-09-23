@@ -1,3 +1,11 @@
+# 0.3.9
+
+- Targets **Flet 1.0.1**: Python floor `flet>=1.0.1`, Dart pubspec `flet: ^1.0.0`.
+- Fixed pending-write flush — Flet 1.0's `run_task` rejects sync callables, so queued `send_bytes` writes were re-queued forever.
+- One shared `Clipboard` service instead of registering a new instance on every copy.
+- New `MobileTerminal` API: `on_mount` property, `ready`, `pending_count`, `clear_pending()`, `flush()`, `set_on_unmount()` — consumers no longer need `_terminal` internals.
+- Search bar `border_color` → `border=OutlineInputBorder` and example SnackBar `duration` → `ft.Duration` (both deprecated/changed in Flet 1.0).
+
 # 0.3.8
 
 - **Host keyboard shortcuts, leak-free.** `Terminal`/`MobileTerminal` gain an `on_shortcut` event. Built-in combos are consumed on the Dart side via xterm's `onKeyEvent` hook — the highest-priority stage of xterm's key pipeline — so they never reach the PTY. Enabled only when `on_shortcut` is set; without a handler all keys flow to the terminal untouched.
