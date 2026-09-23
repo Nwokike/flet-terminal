@@ -1,8 +1,12 @@
 name: Publish to PyPI
 
 on:
-  release:
-    types: [published]
+  # Releases are created by build-all.yml using GITHUB_TOKEN, and GitHub
+  # does not let GITHUB_TOKEN-created events trigger other workflows —
+  # so publishing never fired from `release:` and needed a manual dispatch
+  # every time. Tag pushes fire this directly instead.
+  push:
+    tags: ["v*"]
   workflow_dispatch:
 
 jobs:
