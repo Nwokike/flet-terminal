@@ -36,8 +36,22 @@ jobs:
       - name: Sync Dart/pubspec version with pyproject
         run: python .github/scripts/sync_versions.py
 
+      - name: Check whether this version is already on PyPI
+        id: pypi_check
+        run: |
+          VERSION=$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if curl -sf "https://pypi.org/pypi/flet-terminal/${VERSION}/json" > /dev/null; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "flet-terminal ${VERSION} is already on PyPI — skipping publish."
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build distributions
+        if: steps.pypi_check.outputs.already_published != 'true'
         run: uv build
 
       - name: Publish to PyPI
+        if: steps.pypi_check.outputs.already_published != 'true'
         uses: pypa/gh-action-pypi-publish@release/v1

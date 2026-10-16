@@ -1,11 +1,14 @@
 """PTY Service — cross-platform process and PTY management for Linux, Windows, and Android."""
 
 from __future__ import annotations
+
+import contextlib
 import os
 import struct
 import sys
 import threading
-from typing import Callable, Optional
+from collections.abc import Callable
+from typing import Optional
 
 # Try importing POSIX pty
 HAS_POSIX_PTY = False
@@ -76,47 +79,35 @@ class PTYService:
 
     def stop_session(self):
         if self.pty_master_fd is not None:
-            try:
+            with contextlib.suppress(OSError):
                 os.close(self.pty_master_fd)
-            except OSError:
-                pass
             self.pty_master_fd = None
         if self.pty_process is not None:
-            try:
+            with contextlib.suppress(Exception):
                 if hasattr(self.pty_process, "terminate"):
                     self.pty_process.terminate()
                 else:
                     self.pty_process.close()
-            except Exception:
-                pass
             self.pty_process = None
 
     def write(self, payload: bytes):
         if self.active_engine == "Local OS PTY":
             if HAS_POSIX_PTY and self.pty_master_fd is not None:
-                try:
+                with contextlib.suppress(OSError):
                     os.write(self.pty_master_fd, payload)
-                except OSError:
-                    pass
             elif HAS_WIN_PTY and self.pty_process is not None:
-                try:
+                with contextlib.suppress(Exception):
                     self.pty_process.write(payload.decode("utf-8", errors="ignore"))
-                except Exception:
-                    pass
 
     def resize(self, cols: int, rows: int):
         if self.active_engine == "Local OS PTY":
             if self.pty_master_fd is not None and HAS_POSIX_PTY:
-                try:
+                with contextlib.suppress(Exception):
                     winsize = struct.pack("HHHH", rows, cols, 0, 0)
                     fcntl.ioctl(self.pty_master_fd, termios.TIOCSWINSZ, winsize)
-                except Exception:
-                    pass
             elif HAS_WIN_PTY and self.pty_process is not None and cols > 0 and rows > 0:
-                try:
+                with contextlib.suppress(Exception):
                     self.pty_process.set_size(cols, rows)
-                except Exception:
-                    pass
 
     def _start_posix(self):
         import subprocess

@@ -56,11 +56,11 @@ def _patch_page(control: Any):
         from flet import context
 
         return context.page
-    except Exception:  # noqa: BLE001 - any failure just falls through
+    except Exception:
         logger.debug("context.page unavailable for %s", type(control).__name__)
     try:
         return control.page  # walk parent chain; valid while attached
-    except Exception:  # noqa: BLE001 - detached subtree; caller handles None
+    except Exception:
         logger.debug("parent chain unavailable for %s", type(control).__name__)
         return None
 

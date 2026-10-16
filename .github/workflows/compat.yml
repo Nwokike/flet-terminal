@@ -30,7 +30,7 @@ jobs:
             uv pip install --system flet==${{ matrix.flet }}
           fi
           uv pip install --system -e .
-          uv pip install --system pytest ruff
+          uv pip install --system pytest "ruff==0.17.1"
       - name: Ruff
         run: |
           ruff check src tests examples

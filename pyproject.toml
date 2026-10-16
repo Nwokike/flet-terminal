@@ -45,5 +45,21 @@ build-backend = "setuptools.build_meta"
 [dependency-groups]
 dev = [
     "pytest>=8.0",
-    "ruff>=0.15.22",
+    "ruff==0.17.1",
+]
+
+[tool.ruff]
+# Pin the binary so local, compat-matrix and quality runs lint identically
+# (a floating ruff silently changed the default rule set once already).
+required-version = "==0.17.1"
+target-version = "py310"
+
+[tool.ruff.lint]
+# Explicit select — never rely on moving defaults.
+select = ["E4", "E7", "E9", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    # flet-core style parity: Optional[...]/Union[...] remain readable in
+    # control annotations; the control classes target the flet annotation style.
+    "UP045",
+    "UP007",
 ]

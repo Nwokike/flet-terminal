@@ -17,7 +17,6 @@ from types import SimpleNamespace
 
 from flet_terminal import BUILTIN_THEMES, MobileTerminal
 
-
 # ─── Regression 1 + 2 ───────────────────────────────────────────────────────
 
 

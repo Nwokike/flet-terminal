@@ -23,9 +23,8 @@ def test_thaw_tolerates_none():
 def test_thaw_restores_even_on_exception():
     control = SimpleNamespace()
     control._frozen = 2
-    with pytest.raises(ValueError):
-        with thaw(control):
-            raise ValueError("boom")
+    with pytest.raises(ValueError), thaw(control):
+        raise ValueError("boom")
     assert control._frozen == 2
 
 
