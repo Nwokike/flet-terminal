@@ -16,9 +16,9 @@ Every release builds the demo app for every platform. Sideload or unpack any of 
 
 | Variant | Download | Notes |
 | :--- | :---: | :--- |
-| 📱 **ARM64** (most phones/TVs) | [**app-arm64-v8a-release.apk**](https://github.com/Nwokike/flet-terminal/releases/latest/download/app-arm64-v8a-release.apk) | Modern 64-bit Android devices — grab this one unless you know otherwise |
-| 📱 **ARMv7** (older phones) | [**app-armeabi-v7a-release.apk**](https://github.com/Nwokike/flet-terminal/releases/latest/download/app-armeabi-v7a-release.apk) | Legacy 32-bit Android devices |
-| 💻 **x86_64** (emulators/ChromeOS) | [**app-x86_64-release.apk**](https://github.com/Nwokike/flet-terminal/releases/latest/download/app-x86_64-release.apk) | Android emulators & Chromebooks |
+| 📱 **ARM64** (most phones/TVs) | [**fletterminal-arm64-v8a.apk**](https://github.com/Nwokike/flet-terminal/releases/latest/download/app-arm64-v8a-release.apk) | Modern 64-bit Android devices — grab this one unless you know otherwise |
+| 📱 **ARMv7** (older phones) | [**fletterminal-armeabi-v7a.apk**](https://github.com/Nwokike/flet-terminal/releases/latest/download/app-armeabi-v7a-release.apk) | Legacy 32-bit Android devices |
+| 💻 **x86_64** (emulators/ChromeOS) | [**fletterminal-x86_64.apk**](https://github.com/Nwokike/flet-terminal/releases/latest/download/app-x86_64-release.apk) | Android emulators & Chromebooks |
 | 🪟 **Windows** | [**FletTerminal_windows_x64.zip**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminal_windows_x64.zip) | Portable zip |
 | 🐧 **Linux** | [**FletTerminal_linux_x86_64.tar.gz**](https://github.com/Nwokike/flet-terminal/releases/latest/download/FletTerminal_linux_x86_64.tar.gz) | Universal tarball |
 
