@@ -1,0 +1,59 @@
+name: Compatibility
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The package declares a bare `flet` dependency; this matrix is the
+        # contract that proves which releases it actually supports. Scope:
+        # the 1.0-era declarative APIs this control is built on.
+        flet: ["1.0.0", "1.0.1", "1.0.4", "latest"]
+        python-version: ["3.10", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install flet ${{ matrix.flet }}
+        run: |
+          if [ "${{ matrix.flet }}" = "latest" ]; then
+            uv pip install --system flet
+          else
+            uv pip install --system flet==${{ matrix.flet }}
+          fi
+          uv pip install --system -e .
+          uv pip install --system pytest ruff
+      - name: Ruff
+        run: |
+          ruff check src tests examples
+          ruff format --check src tests examples
+      - name: Tests
+        run: pytest -q
+
+  dart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Pinned to the Flutter version flet embeds for `flet build`.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.8
+          channel: stable
+          cache: true
+      - name: pub get
+        working-directory: src/flutter/flet_terminal
+        run: flutter pub get
+      - name: Analyze
+        working-directory: src/flutter/flet_terminal
+        run: dart analyze
+      - name: Test
+        working-directory: src/flutter/flet_terminal
+        run: flutter test

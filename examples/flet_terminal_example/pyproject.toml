@@ -1,12 +1,12 @@
 [project]
 name = "flet-terminal-example"
-version = "0.3.7"
+version = "0.4.0"
 description = "Cross-Platform Demo & Example app for flet-terminal"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.10"
 dependencies = [
     "flet-terminal",
-    "flet>=0.86.3",
+    "flet",
 ]
 
 [tool.flet]
@@ -17,9 +17,9 @@ build_number = 1
 [tool.flet.app]
 path = "src"
 
-[tool.flet.dev_packages]
-flet-terminal = "../.."
-
+# Local development resolves the checkout in place. CI builds do NOT use this:
+# workflows pre-build the wheel and let `flet build` resolve it via
+# PIP_FIND_LINKS=wheels/ (the house example pattern).
 [tool.uv.sources]
 flet-terminal = { path = "../..", editable = true }
 

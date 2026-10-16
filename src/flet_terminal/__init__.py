@@ -6,6 +6,8 @@ from flet_terminal.search_bar import TerminalSearchBar
 from flet_terminal.terminal import ShortcutEvent, Terminal
 from flet_terminal.themes import BUILTIN_THEMES, get_theme
 
+__version__ = "0.4.0"
+
 __all__ = [
     "BUILTIN_THEMES",
     "DEFAULT_EXTRA_KEYS",

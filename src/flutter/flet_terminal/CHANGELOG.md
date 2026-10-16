@@ -1,3 +1,11 @@
+# 0.4.0
+
+- **`MobileTerminal` now constructs anywhere.** The CTRL/ALT toggles no longer instantiate an `@ft.component` child eagerly, so construction outside an active renderer context (plain `main()`, background tasks, imperative code) no longer raises `RuntimeError: No current renderer is set`. The modifier "lights" repaint imperatively via the new `ExtraKeysBar.refresh_buttons()` — which also fixes the latent `AttributeError` raised by the `MobileTerminal.ctrl_active`/`alt_active` setters in 0.3.9.
+- **Flush is genuinely safe anywhere**: `Terminal._mark_dart_ready()` tolerates detached controls (no page) instead of raising — `MobileTerminal.flush()` works headless.
+- **House-extension standard**: MIT license metadata (`license`/`license-files`), `requires-python >=3.10`, bare `flet` dependency (the compat matrix is the contract — Flet 1.0.0+), narrow Dart package-data (`pubspec.yaml` + `lib/**` only), `__version__` export, `.fvmrc`, `.github/scripts/sync_versions.py`.
+- **Contract test suite** (85 tests): exports, prop defaults, queue semantics, event typing, extra-key byte table, modifier transforms, MobileTerminal regressions, theme pins, search stepping, frozen-support contract.
+- **CI**: `compat.yml` (Flet 1.0.0/1.0.1/1.0.4/latest × Python 3.10/3.14 + Dart analyze/test on Flutter 3.44.8), quality gate in `build-all.yml`, version-sync step in `publish.yml`, and an unsigned split-per-ABI demo APK published with every release.
+
 # 0.3.9
 
 - Targets **Flet 1.0.1**: Python floor `flet>=1.0.1`, Dart pubspec `flet: ^1.0.0`.

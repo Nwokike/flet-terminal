@@ -1,26 +1,42 @@
 [project]
 name = "flet-terminal"
-version = "0.3.9"
+version = "0.4.0"
 description = "Native GPU-accelerated Terminal control for Flet using xterm.dart"
 readme = "README.md"
-requires-python = ">=3.14"
 authors = [
     { name = "Onyeka Nwokike", email = "nwokikeonyeka@gmail.com" }
 ]
+license = { text = "MIT" }
+requires-python = ">=3.10"
+keywords = ["flet", "terminal", "xterm", "android", "ios", "desktop", "cross-platform"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Intended Audience :: Developers",
+]
+# Bare `flet` (no floor): the compat matrix in .github/workflows/compat.yml is
+# the safety net — it proves which flet releases this control actually supports
+# (1.0-era declarative APIs). Never add an upper bound here.
 dependencies = [
-    "flet>=1.0.1",
+    "flet",
 ]
 
 [project.urls]
-Repository = "https://github.com/Nwokike/flet-terminal"
 Homepage = "https://github.com/Nwokike/flet-terminal"
+Repository = "https://github.com/Nwokike/flet-terminal"
 Issues = "https://github.com/Nwokike/flet-terminal/issues"
 
 [tool.setuptools.package-data]
-"flutter.flet_terminal" = ["**/*"]
+"flutter.flet_terminal" = ["pubspec.yaml", "lib/**"]
 
 [tool.setuptools]
-license-files = []
+license-files = ["LICENSE"]
 
 [build-system]
 requires = ["setuptools"]
@@ -28,5 +44,6 @@ build-backend = "setuptools.build_meta"
 
 [dependency-groups]
 dev = [
+    "pytest>=8.0",
     "ruff>=0.15.22",
 ]

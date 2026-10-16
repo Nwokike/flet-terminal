@@ -81,7 +81,13 @@ class Terminal(ft.LayoutControl):
             self._pending_writes.clear()
         remaining = []
         for task_fn, args in pending:
-            if not self.page or not self._dart_ready:
+            # Detached controls raise from `.page`; treat that as "not ready"
+            # so flush() is genuinely safe anywhere (headless included).
+            try:
+                page = self.page
+            except RuntimeError:
+                page = None
+            if not page or not self._dart_ready:
                 remaining.append((task_fn, args))
                 continue
             if task_fn == self.send_bytes and not self._channel_ready:
@@ -90,7 +96,7 @@ class Terminal(ft.LayoutControl):
             try:
                 arg_list = args if args is not None else ()
                 if inspect.iscoroutinefunction(task_fn):
-                    self.page.run_task(task_fn, *arg_list)
+                    page.run_task(task_fn, *arg_list)
                 else:
                     # Flet 1.0's run_task rejects sync callables with
                     # TypeError, which used to re-queue this write forever.

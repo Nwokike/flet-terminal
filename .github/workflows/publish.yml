@@ -32,9 +32,12 @@ jobs:
           
       - name: Install uv
         uses: astral-sh/setup-uv@v6
-        
+
+      - name: Sync Dart/pubspec version with pyproject
+        run: python .github/scripts/sync_versions.py
+
       - name: Build distributions
         run: uv build
-        
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
