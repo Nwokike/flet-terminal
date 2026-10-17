@@ -7,8 +7,27 @@ import os
 import struct
 import sys
 import threading
+import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Optional
+
+
+def _default_shell() -> str:
+    """Pick a working interactive shell for this host.
+
+    Order: $SHELL (desktop logins set it) → Android's /system/bin/sh ->
+    /bin/bash → /bin/sh. Android has no $SHELL and no /bin/bash, which is why
+    the demo used to die with "no PTY" there.
+    """
+    env_shell = os.environ.get("SHELL", "")
+    if env_shell and Path(env_shell).exists():
+        return env_shell
+    for candidate in ("/system/bin/sh", "/bin/bash", "/bin/sh"):
+        if Path(candidate).exists():
+            return candidate
+    return "/bin/sh"
+
 
 # Try importing POSIX pty
 HAS_POSIX_PTY = False
@@ -79,16 +98,31 @@ class PTYService:
 
     def stop_session(self):
         if self.pty_master_fd is not None:
+            # Closes the master — the slave side (and the child) see EOF.
             with contextlib.suppress(OSError):
                 os.close(self.pty_master_fd)
             self.pty_master_fd = None
         if self.pty_process is not None:
+            proc, self.pty_process = self.pty_process, None
             with contextlib.suppress(Exception):
-                if hasattr(self.pty_process, "terminate"):
-                    self.pty_process.terminate()
-                else:
-                    self.pty_process.close()
-            self.pty_process = None
+                if not getattr(proc, "isalive", lambda: False)():
+                    return
+            # Preferred: ask the shell to exit (works for both engines).
+            with contextlib.suppress(Exception):
+                proc.write(b"exit\r\n")
+            # Give it a moment, then force whatever API is available.
+            deadline = 0.0
+            while deadline < 1.0:
+                if not getattr(proc, "isalive", lambda: False)():
+                    break
+                time.sleep(0.05)
+                deadline += 0.05
+            with contextlib.suppress(Exception):
+                if getattr(proc, "isalive", lambda: False)():
+                    if hasattr(proc, "terminate"):
+                        proc.terminate()
+                    elif hasattr(proc, "close"):
+                        proc.close()
 
     def write(self, payload: bytes):
         if self.active_engine == "Local OS PTY":
@@ -114,28 +148,39 @@ class PTYService:
 
         try:
             master_fd, slave_fd = pty.openpty()
-            shell = os.environ.get("SHELL", "/bin/bash")
+            shell = _default_shell()
+            # A login shell gives the interactive prompt profile (PS1 etc.);
+            # Android's /system/bin/sh (mksh) has no -l login convention.
+            argv = [shell]
+            if not shell.startswith("/system/bin/sh"):
+                argv.append("-l")
+            env = dict(os.environ)
+            env.setdefault("TERM", "xterm-256color")
+            env.setdefault("HOME", os.path.expanduser("~"))
             self.pty_process = subprocess.Popen(
-                [shell, "-l"],
+                argv,
                 stdin=slave_fd,
                 stdout=slave_fd,
                 stderr=slave_fd,
                 close_fds=True,
                 start_new_session=True,
+                env=env,
             )
             os.close(slave_fd)
             self.pty_master_fd = master_fd
 
             def read_loop():
-                while (
-                    self.pty_master_fd == master_fd and self.pty_master_fd is not None
-                ):
+                while True:
+                    proc = self.pty_process
+                    if proc is None:
+                        break
                     try:
                         data = os.read(master_fd, 4096)
-                        if not data:
-                            break
+                    except (OSError, ValueError):
+                        break  # master closed (stop_session) or fd gone
+                    if data:
                         self._on_output(data)
-                    except (OSError, Exception):
+                    elif proc.poll() is not None:
                         break
 
             threading.Thread(target=read_loop, daemon=True).start()
@@ -144,19 +189,26 @@ class PTYService:
 
     def _start_winpty(self):
         try:
-            self.pty_process = winpty.PTY(80, 24)
-            self.pty_process.spawn(
-                r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
-            )
+            proc = winpty.PTY(80, 24)
+            proc.spawn(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe")
+            self.pty_process = proc
 
             def read_loop():
-                while self.pty_process is not None:
+                # pywinpty's read() defaults to NON-blocking and returns only
+                # what is currently buffered — the old loop treated that first
+                # empty read as EOF and exited instantly. blocking=True waits
+                # for the next chunk; empty+lifeless means the child is gone.
+                while True:
+                    live = self.pty_process
+                    if live is None or live is not proc:
+                        break
                     try:
-                        data = self.pty_process.read()
-                        if not data:
-                            break
-                        self._on_output(data.encode("utf-8"))
+                        data = proc.read(blocking=True)
                     except Exception:
+                        break
+                    if data:
+                        self._on_output(data.encode("utf-8"))
+                    elif not proc.isalive():
                         break
 
             threading.Thread(target=read_loop, daemon=True).start()

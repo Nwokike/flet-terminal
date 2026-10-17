@@ -1,3 +1,10 @@
+# 0.4.1
+
+- **Restored: reactive CTRL/ALT painting.** 0.4.0 replaced the `@ft.component`/`@ft.observable` modifier buttons with imperative `refresh_buttons()` repaints — a regression: the toggles stopped repainting in real component trees. The reactive `ModifierKey` mechanism is back, identical to 0.3.9; `ExtraKeysBar.refresh_buttons()` stays as a compatibility no-op because the `ModifierState` observable drives every repaint (taps, payload consumption, resets, setter assignments).
+- **Construct-anywhere kept**: creating `MobileTerminal`/`ExtraKeysBar` outside a renderer context still never raises — in that case the modifier components are created inside a throwaway `Renderer().with_context()` (the README-documented pattern) and subscribe normally once the tree renders.
+- `Terminal._mark_dart_ready()` keeps the detached-control tolerance (flush stays safe headless).
+- Demo app: platform-aware default shell (`$SHELL` → `/system/bin/sh` on Android → `/bin/bash` → `/bin/sh`), `TERM` seeded for the child, and `pywinpty` added for the Windows engine — the demo is now usable on Android, Windows and Linux.
+
 # 0.4.0
 
 - **`MobileTerminal` now constructs anywhere.** The CTRL/ALT toggles no longer instantiate an `@ft.component` child eagerly, so construction outside an active renderer context (plain `main()`, background tasks, imperative code) no longer raises `RuntimeError: No current renderer is set`. The modifier "lights" repaint imperatively via the new `ExtraKeysBar.refresh_buttons()` — which also fixes the latent `AttributeError` raised by the `MobileTerminal.ctrl_active`/`alt_active` setters in 0.3.9.

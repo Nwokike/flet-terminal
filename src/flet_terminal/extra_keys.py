@@ -24,6 +24,12 @@ logger = logging.getLogger(__name__)
 __all__ = ["DEFAULT_EXTRA_KEYS", "ExtraKeysBar"]
 
 
+# Reactive modifier state. Flet 1.0's declarative model only repaints a control
+# when its owning @ft.component re-renders (it diffs the previous render tree
+# against the new one). Mutating `style` + `update()` is a no-op there, so the
+# CTRL/ALT "light" is driven by this observable: the buttons subscribe to it and
+# re-render whenever a flag flips.
+@ft.observable
 @dataclass
 class ModifierState:
     """Sticky CTRL/ALT state shared between ExtraKeysBar logic and the buttons."""
@@ -42,21 +48,45 @@ def _modifier_style(active: bool) -> ft.ButtonStyle:
     )
 
 
-def _make_modifier_button(label: str, on_toggle: Callable[[], None]) -> ft.Button:
-    """A single CTRL/ALT toggle rendered as a plain button.
+@ft.component
+def ModifierKey(state: ModifierState, label: str, on_toggle: Callable[[], None]):
+    """A single CTRL/ALT toggle rendered reactively from `state`.
 
-    Plain (non-``@ft.component``) construction is deliberate: it keeps the bar
-    — and every ``MobileTerminal`` embedding it — constructible anywhere, with
-    or without an active renderer context. The modifier "light" is repainted
-    imperatively by :meth:`ExtraKeysBar.refresh_buttons` (thaw +
-    control_update), the same pattern the rest of this package uses.
+    Subscribing to `state` via `use_state` makes this component re-render (and
+    repaint the button) the moment `state.ctrl`/`state.alt` changes — whether
+    the change came from a tap here or from `reset_modifiers()` on the bar.
     """
+    st, _ = ft.use_state(state)
+    which = label.lower()
+    active = getattr(st, which)
     return ft.Button(
         content=ft.Text(label, size=BTN_FONT_SIZE, weight=ft.FontWeight.BOLD),
         height=BTN_HEIGHT,
-        style=_modifier_style(False),
+        style=_modifier_style(active),
         on_click=lambda e: on_toggle(),
     )
+
+
+def _make_modifier_key(
+    state: ModifierState, label: str, on_toggle: Callable[[], None]
+) -> ft.Control:
+    """Create a reactive `ModifierKey`, with or without an active renderer.
+
+    Inside a component tree (the normal case — every shipped consumer embeds
+    ``MobileTerminal`` in a declarative app) the component is created directly
+    and paints via its observable subscription. Outside one (imperative
+    construction, background tasks) Flet has no current renderer and the call
+    raises ``RuntimeError`` — retry inside a throwaway renderer context (the
+    pattern the README documents), so construction never fails. The returned
+    ``Component`` renders — and subscribes — when it first enters a real tree.
+    """
+    try:
+        return ModifierKey(state, label, on_toggle)
+    except RuntimeError:
+        from flet.components.component import Renderer
+
+        with Renderer().with_context():
+            return ModifierKey(state, label, on_toggle)
 
 
 DEFAULT_EXTRA_KEYS: list[tuple[str, bytes | None]] = [
@@ -174,8 +204,8 @@ class ExtraKeysBar(ft.Container):
         )
 
     # Backwards-compatible accessors. MobileTerminal assigns these (e.g. from
-    # the Dart `modifier_reset` event); routing them through the setters keeps
-    # the on-screen buttons in sync via `refresh_buttons()`.
+    # the Dart `modifier_reset` event); routing them through the observable
+    # keeps the on-screen buttons in sync via their reactive subscription.
     @property
     def ctrl_active(self) -> bool:
         return self._mods.ctrl
@@ -183,7 +213,6 @@ class ExtraKeysBar(ft.Container):
     @ctrl_active.setter
     def ctrl_active(self, value: bool):
         self._mods.ctrl = bool(value)
-        self.refresh_buttons()
 
     @property
     def alt_active(self) -> bool:
@@ -192,23 +221,6 @@ class ExtraKeysBar(ft.Container):
     @alt_active.setter
     def alt_active(self, value: bool):
         self._mods.alt = bool(value)
-        self.refresh_buttons()
-
-    def refresh_buttons(self):
-        """Repaint the CTRL/ALT toggles from the current modifier state.
-
-        Invoked on every state change: taps (`_toggle_modifier`), sticky
-        modifiers consumed by a send (`_send_payload`), `reset_modifiers()`,
-        and the `ctrl_active`/`alt_active` setters.
-        """
-        for btn, active in (
-            (self._btn_ctrl, self._mods.ctrl),
-            (self._btn_alt, self._mods.alt),
-        ):
-            if btn is not None:
-                with thaw(btn):
-                    btn.style = _modifier_style(active)
-                    control_update(btn)
 
     def _get_settings_menu_items(self) -> list[ft.Control]:
         """Return the refreshed list of items with current checkmarks and font size."""
@@ -332,7 +344,8 @@ class ExtraKeysBar(ft.Container):
     def _make_key_btn(self, label: str, payload: bytes | None) -> ft.Control:
         if payload is None:
             is_ctrl = label == "CTRL"
-            btn = _make_modifier_button(
+            btn = _make_modifier_key(
+                self._mods,
                 label,
                 lambda: self._toggle_modifier(is_ctrl),
             )
@@ -364,15 +377,25 @@ class ExtraKeysBar(ft.Container):
             self._mods.ctrl = not self._mods.ctrl
         else:
             self._mods.alt = not self._mods.alt
-        self.refresh_buttons()
+        # The button repaints via its reactive subscription to `self._mods`;
+        # no imperative style/update is needed (or even effective) here.
         self._on_modifier_change(self._mods.ctrl, self._mods.alt)
 
     def reset_modifiers(self):
         if self._mods.ctrl or self._mods.alt:
             self._mods.ctrl = False
             self._mods.alt = False
-            self.refresh_buttons()
             self._on_modifier_change(self._mods.ctrl, self._mods.alt)
+
+    def refresh_buttons(self):
+        """Compatibility no-op: the CTRL/ALT toggles repaint reactively.
+
+        The modifier buttons are `ModifierKey` components subscribed to
+        `self._mods`; every state change (taps, payload consumption,
+        `reset_modifiers()`, the `ctrl_active`/`alt_active` setters) notifies
+        that observable and Flet re-renders the buttons. Kept as a public
+        method for callers written against earlier revisions.
+        """
 
     def _send_payload(self, payload: bytes):
         if self._mods.ctrl and len(payload) == 1:
@@ -382,12 +405,10 @@ class ExtraKeysBar(ft.Container):
             elif 65 <= code <= 90:
                 payload = bytes([code - 64])
             self._mods.ctrl = False
-            self.refresh_buttons()
             self._on_modifier_change(self._mods.ctrl, self._mods.alt)
         if self._mods.alt:
             payload = b"\x1b" + payload
             self._mods.alt = False
-            self.refresh_buttons()
             self._on_modifier_change(self._mods.ctrl, self._mods.alt)
         self._on_send_payload(payload)
 
