@@ -161,13 +161,19 @@ class _FletTerminalControlState extends State<FletTerminalControl> {
       widget.control.triggerEvent("bell", "");
     };
 
-    // Setup resize forwarding to Python
+    // Setup resize forwarding to Python. The payload also carries the soft
+    // keyboard's bottom inset (MediaQuery.viewInsets.bottom): apps shrink the
+    // whole terminal layout (terminal + extra-keys bar) when the keyboard
+    // opens, so the keys bar rides above the keyboard instead of being
+    // covered by it.
     _terminal.onResize = (width, height, pixelWidth, pixelHeight) {
+      final bottomInset = MediaQuery.of(context).viewInsets.bottom;
       widget.control.triggerEvent(
           "resize",
           jsonEncode({
             "cols": width,
             "rows": height,
+            "bottom_inset": bottomInset.round(),
           }));
     };
   }

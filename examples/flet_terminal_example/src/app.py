@@ -26,25 +26,36 @@ class DemoState:
     def __init__(self):
         self.engines: list[str] = PTYService.available_engines()
         self.active_engine: str = PTYService.get_default_engine()
+        # Soft-keyboard bottom inset (px), from the terminal's resize event.
+        # While > 0 the App reserves that much bottom padding so the extra
+        # keys bar rides above the keyboard (CollabShell behavior) instead of
+        # being covered by it.
+        self.keyboard_inset: int = 0
         # Terminal settings (drive the FAB menu checkmarks)
         self.theme: str = "JetBrains Dark"
         self.blink: bool = True
         self.search: bool = False
 
 
-def _make_resize_handler(pty: PTYService):
+def _make_resize_handler(pty: PTYService, ds: DemoState):
     def handle_resize(e):
         try:
             data = json.loads(e.data)
-            pty.resize(int(data.get("cols", 80)), int(data.get("rows", 24)))
+            cols = int(data.get("cols", 80))
+            rows = int(data.get("rows", 24))
+            inset = int(data.get("bottom_inset", 0) or 0)
         except ValueError:
             # Malformed resize payload — the PTY keeps its last size.
-            pass
+            return
+        pty.resize(cols, rows)
+        # Reserve the keyboard's inset so the extra-keys bar stays visible.
+        if inset != ds.keyboard_inset:
+            ds.keyboard_inset = inset
 
     return handle_resize
 
 
-def _make_bundle(page: ft.Page):
+def _make_bundle(page: ft.Page, ds: DemoState):
     """Create the long-lived terminal + PTY pair (runs once per mount).
 
     Every handler is wired before the controls enter the component tree.
@@ -59,7 +70,9 @@ def _make_bundle(page: ft.Page):
         cursor_style="block",
         cursor_blink=True,
         theme=BUILTIN_THEMES["JetBrains Dark"],
-        auto_focus=True,
+        # CollabShell parity: auto_focus=False on mobile (requestFocus pops the
+        # soft keyboard); desktop users click the terminal to focus.
+        auto_focus=False,
     )
 
     pty = PTYService(
@@ -72,8 +85,14 @@ def _make_bundle(page: ft.Page):
             )
         ),
     )
+    # CollabShell-parity input wiring. The fast binary path (DataChannel) lands
+    # in set_on_bytes; the legacy string path (triggerEvent "data") — which is
+    # where soft-keyboard characters arrive on Android — is a SEPARATE channel,
+    # so it needs its own handler. Missing it is why letters didn't come
+    # through while delete did.
     mt.set_on_bytes(pty.write)
-    mt.on_resize = _make_resize_handler(pty)
+    mt.on_data = lambda e: pty.write(e.data if isinstance(e.data, str) else str(e.data))
+    mt.on_resize = _make_resize_handler(pty, ds)
     return mt, pty
 
 
@@ -98,7 +117,7 @@ def _item(
 def App() -> ft.Control:
     page = ft.context.page
     ds, _ = ft.use_state(DemoState)
-    bundle, _ = ft.use_state(lambda: _make_bundle(page))
+    bundle, _ = ft.use_state(lambda: _make_bundle(page, ds))
     mt, pty = bundle
 
     def switch_engine(engine_name: str):
@@ -249,10 +268,21 @@ def App() -> ft.Control:
         margin=ft.Padding(0, 0, 52, 16),
     )
 
+    # When the soft keyboard is up, reserve its inset as bottom padding: the
+    # whole terminal column (including the extra-keys bar) shrinks so the bar
+    # rides above the keyboard instead of being covered by it.
+    terminal_column = ft.Column(controls=[appbar, mt], spacing=0, expand=True)
+    if ds.keyboard_inset > 0:
+        terminal_column = ft.Container(
+            content=terminal_column,
+            padding=ft.Padding.only(bottom=ds.keyboard_inset),
+            expand=True,
+        )
+
     return ft.SafeArea(
         content=ft.Stack(
             controls=[
-                ft.Column(controls=[appbar, mt], spacing=0, expand=True),
+                terminal_column,
                 settings_fab,
             ],
             alignment=ft.alignment.Alignment.BOTTOM_RIGHT,
