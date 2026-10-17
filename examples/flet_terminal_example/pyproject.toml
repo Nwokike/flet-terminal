@@ -18,17 +18,6 @@ build_number = 1
 [tool.flet.app]
 path = "src"
 
-# APK size (verified 2026-10-17 by diffing against the M0-spike APKs):
-# WITHOUT this, the build template ships native libs UNCOMPRESSED
-# (extractNativeLibs=false semantics) — libapp.so/libflutter.so/libpython...
-# all STORED = +24 MB APK for the same code. The M0 spike (which sets
-# legacy_packaging=true) is 27.7 MB where this example was 55 MB with the
-# same deps. With it, libs DEFLATE (extracted at install — a slightly larger
-# on-disk install, a much smaller download). Apps that don't exec native
-# payloads can still set it purely for download size.
-[tool.flet.android]
-legacy_packaging = true
-split_per_abi = true
 
 # Local development resolves the checkout in place. CI builds do NOT use this:
 # workflows pre-build the wheel and let `flet build` resolve it via

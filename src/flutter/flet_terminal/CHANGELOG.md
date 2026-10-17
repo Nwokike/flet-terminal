@@ -2,7 +2,6 @@
 
 - **Soft-keyboard fix (owner-tested gaps):** the resize event payload now carries `bottom_inset` (the keyboard's height), so an app can reserve that space and keep the virtual extra-keys bar ABOVE the keyboard instead of behind it. Payload is backward compatible (`cols`/`rows` unchanged; `bottom_inset` is a new key).
 - **Demo app aligned with the CollabShell integration** (the owner's reference implementation): it now wires `on_data` in addition to `set_on_bytes` — soft-keyboard characters on Android arrive on the string "data" event, not only the binary DataChannel, which is why letters didn't come through while delete did. `auto_focus=False` (desktop clicks focus; mobile no longer force-pops the keyboard).
-- **Demo APK size halved (root cause: build packaging, not dependencies).** The example set no `legacy_packaging`, so the template shipped native libs UNCOMPRESSED (libapp.so/libflutter.so/libpython3.14.so all STORED = +24 MB for identical code). Setting `[tool.flet.android].legacy_packaging = true` makes those libs DEFLATE like the M0-spike APKs (27.7 MB vs 55 MB for the same dep set). Every Flet app missing this flag ships an oversized APK.
 
 # 0.4.1
 
