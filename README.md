@@ -209,6 +209,10 @@ with thaw(some_control):
     some_control.update()
 ```
 
+## APK size (verified 2026-10-17)
+
+If your release APK looks ~2x larger than expected for the dependency set, check `[tool.flet.android].legacy_packaging`. Without it the Flet build template ships native libs **uncompressed** (`libapp.so`, `libflutter.so`, `libpython3.14.so`... all STORED = +24 MB for identical code); with `legacy_packaging = true` they DEFLATE and are extracted at install. The M0-spike APK (27.7 MB) and this example (55 MB before the flag, ~28 MB after) are the A/B proof.
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
